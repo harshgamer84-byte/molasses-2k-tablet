@@ -32,7 +32,8 @@ time npx remotion still src/index.ts MolassesShort out/speedtest/molasses-f100.j
   --frame=100 --scale=1.3333333333333333 \
   --browser-executable="$CHROME" \
   --binaries-location="/data/data/com.termux/files/usr/bin" \
-  --gl=swangle --image-format=jpeg --timeout=600000 --overwrite
+  --gl=angle-egl \
+  --image-format=jpeg --timeout=600000 --overwrite
 ls -lh out/speedtest/molasses-f100.jpg
 echo ""
 echo "If the still looks right (open it and check the picture is there),"

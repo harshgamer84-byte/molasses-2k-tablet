@@ -43,10 +43,10 @@ echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 
 | Issue | Fix | Why |
 |-------|-----|-----|
-| `Error creating WebGL context` | `--gl=swangle` | ARM Chromium ANGLE fails |
-| FFmpeg audio filter errors | `--muted` on chunks | Termux FFmpeg compatibility |
-| Slow software WebGL | `antialias: false` | 20-30% faster rendering |
-| Long socket paths | `TMPDIR=$PWD/remotion-tmp` | Chromium 108-char limit |
+| `Error creating WebGL context` | `--gl=angle-egl` | `angle`, `swangle`, `swiftshader` fail on ARM Chromium |
+| WebGL context loss / OOM | Half-res ThreeCanvas + CSS `scale(2)` | 75% memory reduction |
+| FFmpeg audio filter errors | `--muted` on chunks | Termux FFmpeg rejects `-filter_script:a` |
+| Long socket paths | `TMPDIR=$PWD/remotion-tmp` | Chromium 108-char UNIX socket limit |
 
 ## Verification
 

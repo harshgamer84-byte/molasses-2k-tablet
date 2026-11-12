@@ -3,13 +3,15 @@
 # Usage: bash scripts/optimize-for-termux.sh [project-root]
 #
 # WHAT IT DOES:
-# 1. Fixes render scripts: switches --gl=angle to --gl=swangle (software WebGL)
+# 1. Fixes render scripts: switches to --gl=angle-egl (proven working WebGL on ARM Android!)
 # 2. Adds --muted flag to chunk renders (Termux FFmpeg compatibility)
-# 3. Patches ThreeCanvas components: adds antialias: false for software GL
-# 4. Creates/updates speedtest and render scripts for Termux environment
-# 5. Validates Chromium and FFmpeg availability
+# 3. Patches ThreeCanvas: half-res + CSS transform scale(2) for WebGL memory stability
+# 4. Validates Chromium and FFmpeg availability
 #
-# Run this on ANY Remotion project folder to prepare it for tablet rendering.
+# PROVEN WORKING CONFIGURATION (tested on ~/minimalist-v5 and ~/m2k):
+# - Backend: --gl=angle-egl
+# - Canvas: width/2, height/2 wrapped in <div style={{ transform: "scale(2)", transformOrigin: "top left" }}>
+# - gl prop: { antialias: false, stencil: false, powerPreference: "high-performance" }
 
 set -e
 PROJECT_ROOT="${1:-.}"
@@ -54,9 +56,9 @@ SCRIPT_COUNT=0
 for script in scripts/*.sh; do
   [ -f "$script" ] || continue
   
-  if grep -q -- '--gl=angle' "$script" 2>/dev/null; then
-    echo "  → $script: switching --gl=angle to --gl=swangle"
-    sed -i 's/--gl=angle/--gl=swangle/g' "$script"
+  if grep -q -- '--gl=' "$script" 2>/dev/null; then
+    echo "  → $script: switching to --gl=angle-egl"
+    sed -i -E 's/--gl=[a-zA-Z_-]+/--gl=angle-egl/g' "$script"
     ((SCRIPT_COUNT++))
   fi
   

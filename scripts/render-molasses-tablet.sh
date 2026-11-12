@@ -108,7 +108,7 @@ render_chunk() {
     --frames="$range" \
     --browser-executable="$CHROME" \
     --binaries-location="$BINARIES" \
-    --gl=swangle --concurrency=1 --timeout=600000 --muted --overwrite \
+    --gl=angle-egl --concurrency=1 --timeout=600000 --muted --overwrite \
     > "out/render/$name.log" 2>&1
   echo "=== $name DONE $(date -Is) ===" | tee -a out/render/progress.log
 }

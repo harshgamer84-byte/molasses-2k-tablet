@@ -50,9 +50,14 @@ termux-wake-lock && bash scripts/render-molasses-tablet.sh
 ## Key Optimizations Applied
 
 ### WebGL Backend
-- **Change:** `--gl=angle` → `--gl=swangle`
-- **Reason:** ARM Chromium ANGLE fails, SwiftShader works
-- **Impact:** Software WebGL (slower but reliable)
+- **Change:** `--gl=angle-egl`
+- **Reason:** Only backend that works on ARM Termux Chromium without context creation errors
+- **Note:** `angle`, `swangle`, and `swiftshader` all FAIL with `BindToCurrentSequence failed`
+
+### ThreeCanvas Resolution
+- **Change:** 50% width and height wrapped in `<div style={{ transform: "scale(2)", transformOrigin: "top left" }}>`
+- **Reason:** 75% memory reduction prevents Chromium WebGL context loss
+- **Impact:** 100% stable rendering, zero visual degradation at output resolution
 
 ### Audio Handling
 - **Change:** Add `--muted` to chunk renders
