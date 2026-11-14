@@ -1,5 +1,5 @@
 // Timeline of the molasses short: "The Day a Wave of Molasses Crushed a City" (Boston, 15 Jan 1919).
-// Shots timed to the voice words (SCRIPT.md, ~4.0 words/s, 266 words, 2010 frames = 67 s), using the same
+// Shots timed to the voice words (SCRIPT.md, ~3.12 words/s, 271 words, 2602 frames = 86.7 s), using the same
 // camera grammar as the bridge short: continuous slow push-ins; symmetric smootherstep glides 18-40 f;
 // big reframes are cuts; impacts are 7-frame kicks that flip sign every frame; no hand-held float.
 // SCAFFOLD NOTE: the world (world.ts / build.ts) still builds the BRIDGE's river/town set, not a Boston
@@ -11,7 +11,7 @@
 // (front/marchPhase/amp/deckY/bridgeState) are the bridge set's and are kept only so world.ts/cast.ts
 // keep typechecking and rendering.
 export const FPS = 30;
-export const TOTAL = 2010;
+export const TOTAL = 2602;
 export const D0 = 6.0; // bank top + deck height (m) of the bridge set
 export const HALF = 27; // towers at z = +-27, span 54 m
 export const FILES = [-1.65, -0.55, 0.55, 1.65];
@@ -35,10 +35,10 @@ const lin = (pts: [number, number][], x: number) => {
 // ---------------- story physics (tau = story time in seconds; bridge set only) ----------------
 export const front = (tau: number) => 26 - 1.6 * (tau - 4.4); // z of the front row, marching toward -z
 export const marchPhase = (tau: number) => ((tau % 1) + 1) % 1; // 1 Hz cycle = 2 steps/s, footfalls at 0 and 0.5
-export const SNAP = 27.0, DROP0 = 28.0, DROP1 = 28.6; // SNAP = f 810, the tank bursts
+export const SNAP = 35.574, DROP0 = 36.756, DROP1 = 37.651; // SNAP = f 1067, the tank bursts
 export const amp = (tau: number) =>
-  lin([[14.85, 0], [17.8, 0.07], [21.4, 0.13], [27.4, 0.26], [33.0, 0.46], [SNAP, 0.55], [SNAP + 0.35, 0.0]], tau);
-export const stomp = (tau: number) => lin([[21.4, 1.0], [27.4, 1.35], [33, 1.5]], tau); // "a little harder every step"
+  lin([[21.469, 0], [24.255, 0.07], [27.772, 0.13], [36.027, 0.26], [43.942, 0.46], [SNAP, 0.55], [SNAP + 0.35, 0.0]], tau);
+export const stomp = (tau: number) => lin([[27.772, 1.0], [36.027, 1.35], [43.942, 1.5]], tau); // "a little harder every step"
 export const shapeZ = (z: number) => (Math.abs(z) < HALF ? Math.cos((Math.PI * z) / (2 * HALF)) : 0);
 export const dropW = (z: number) => smooth((20 - z) / 26); // 1 on the near half, 0 at the far tower
 export const dropU = (tau: number) => (tau < DROP0 ? 0 : Math.min(1, ((tau - DROP0) / (DROP1 - DROP0)) ** 2));
@@ -54,26 +54,26 @@ export type Light = "day" | "golden";
 export type Crowd = "march" | "fall" | "water" | "bank" | "tourists" | "none" | "street" | "flee" | "trapped" | "park";
 export type ShotDef = { id: number; a: number; b: number; light: Light; crowd: Crowd; tau: (t: number) => number; towns?: boolean };
 export const SHOTS: ShotDef[] = [
-  { id: 1, a: 0, b: 174, light: "day", crowd: "street", tau: (t) => t }, // HOOK: Antonio + sister gathering firewood, tank looming
-  { id: 2, a: 174, b: 360, light: "day", crowd: "street", tau: (t) => t, towns: true }, // SETTING: 50 ft tank over the tenements
-  { id: 3, a: 360, b: 585, light: "day", crowd: "street", tau: (t) => t }, // ACTION 1: leaks, kid's bucket catching a drip
-  { id: 4, a: 585, b: 810, light: "day", crowd: "street", tau: (t) => t }, // ACTION 2: warm day, camera creeps up the tank
-  { id: 5, a: 810, b: 1020, light: "day", crowd: "flee", tau: (t) => t }, // SNAP: tank bursts, molasses wall, crowd flees
-  { id: 6, a: 1020, b: 1110, light: "day", crowd: "trapped", tau: (t) => t }, // DEADPAN: drowned street, tilted train car
-  { id: 7, a: 1110, b: 1500, light: "day", crowd: "none", tau: (t) => t }, // EXPLANATION: cold honey (a) / warm pour + wave (b)
-  { id: 8, a: 1500, b: 1785, light: "day", crowd: "none", tau: (t) => t }, // CONSEQUENCE: stamp "APPROVED" / rebuilt street
-  { id: 9, a: 1785, b: TOTAL, light: "golden", crowd: "park", tau: (t) => t }, // CALLBACK: Langone Park ballpark, golden hour
+  { id: 1, a: 0, b: 231, light: "day", crowd: "street", tau: (t) => t }, // HOOK: Antonio + sister gathering firewood, tank looming
+  { id: 2, a: 231, b: 550, light: "day", crowd: "street", tau: (t) => t, towns: true }, // SETTING: 50 ft tank over the tenements
+  { id: 3, a: 550, b: 778, light: "day", crowd: "street", tau: (t) => t }, // ACTION 1: leaks, kid's bucket catching a drip
+  { id: 4, a: 778, b: 1067, light: "day", crowd: "street", tau: (t) => t }, // ACTION 2: warm day, camera creeps up the tank
+  { id: 5, a: 1067, b: 1357, light: "day", crowd: "flee", tau: (t) => t }, // SNAP: tank bursts, molasses wall, crowd flees
+  { id: 6, a: 1357, b: 1488, light: "day", crowd: "trapped", tau: (t) => t }, // DEADPAN: drowned street, tilted train car
+  { id: 7, a: 1488, b: 1939, light: "day", crowd: "none", tau: (t) => t }, // EXPLANATION: cold honey (a) / warm pour + wave (b)
+  { id: 8, a: 1939, b: 2372, light: "day", crowd: "none", tau: (t) => t }, // CONSEQUENCE: stamp "APPROVED" / rebuilt street
+  { id: 9, a: 2372, b: TOTAL, light: "golden", crowd: "park", tau: (t) => t }, // CALLBACK: Langone Park ballpark, golden hour
 ];
 /** crossfades (frames) at place/time changes; a white 4-frame flash after the hook */
 export const XFADE: Record<number, number> = { 7: 8, 8: 8 };
-export const FLASH_AT = 174;
-/** shot 7 beat boundary (f 1326): cold-honey close-up -> warm pour + wave slamming a wall, a hard cut
+export const FLASH_AT = 231;
+/** shot 7 beat boundary (f 1740): cold-honey close-up -> warm pour + wave slamming a wall, a hard cut
  *  (the skill allows cuts on big jumps, and jar-CU -> wave-slam is one). Word timing (SCRIPT.md,
- *  ~3.97 words/s from f 1110): "But" ~f 1322, "warm" ~f 1329, so the cut lands 3 f before "warm"
+ *  ~3.12 words/s from f 1488): "But" ~f 1740, "warm" ~f 1747, so the cut lands 3 f before "warm"
  *  (the old midpoint value 1305 landed ~21 f early, mid "it set like glue").
  *  TODO: layersAt only crossfades at shot starts, so a mid-shot beat crossfade needs a ShotView that
  *  can render two framings of one shot (world-rebuild step). */
-export const BEAT_XFADE_AT = 1326;
+export const BEAT_XFADE_AT = 1740;
 
 export const shotAt = (f: number) => SHOTS.find((s) => f >= s.a && f < s.b) ?? SHOTS[SHOTS.length - 1];
 /** layers to draw at frame f: base shot, plus the next shot fading in during a crossfade */
@@ -152,7 +152,7 @@ export const snapEnd = (snap: number): V3 => {
 // The scaffold had the camera NORTH of the kids (z -12/-6.5) looking south, so the tank sat behind
 // the lens; flipped to the south side (z 11/6.5) looking north.
 const S1a = (f: number) => dolly([6.5, D0 + 1.8, 11], [0, D0 + 1.6, 0.5], pushK(f, 0, 0.0025), { fov: 42 });
-const S1b = (f: number) => dolly([2.0, D0 + 1.5, 6.5], [0, D0 + 1.6, 0.5], pushK(f, 90, 0.002), { fov: 38, roll: -0.03 });
+const S1b = (f: number) => dolly([2.0, D0 + 1.5, 6.5], [0, D0 + 1.6, 0.5], pushK(f, 114, 0.002), { fov: 38, roll: -0.03 });
 // shot 2 (setting): wide establishing from the SOUTH-EAST corner of the street, looking diagonally
 // north-west: the tank sits right-of-centre, the elevated railway and the west tenements read on the
 // left, the street leads in below. A head-on wide from the north end cannot work — the tank is a 27 m
@@ -162,83 +162,83 @@ const S1b = (f: number) => dolly([2.0, D0 + 1.5, 6.5], [0, D0 + 1.6, 0.5], pushK
 // S2a [17, 13, -52] stood inside the east tenement row (|x| 15..28) and its S2b [8, 11, -40] inside
 // the tank. S2b is a CUT, not a glide: the ~15 m push-in is a big jump per the camera grammar, and it
 // keeps the same diagonal composition, closer (tank right 2/3, railway + tenements left 1/3).
-const S2a = (f: number) => zoom([12, D0 + 10, 16], [-16, D0 + 6, -28], 44, pushK(f, 174, 0.002)); // pulled back: the 27 m tank filled the whole frame at 22 m
-const S2b = (f: number) => zoom([10, D0 + 6, 2], [-6, D0 + 5, -20], 42, pushK(f, 260, 0.002));
+const S2a = (f: number) => zoom([12, D0 + 10, 16], [-16, D0 + 6, -28], 44, pushK(f, 231, 0.002)); // pulled back: the 27 m tank filled the whole frame at 22 m
+const S2b = (f: number) => zoom([10, D0 + 6, 2], [-6, D0 + 5, -20], 42, pushK(f, 354, 0.002));
 // shot 3 (action 1, leaks): close-up of the rivets / drips on the tank's near face, bucket catching
 // a drip. The scaffold's ANCHOR [-2.7, D0+0.62, -37] was inside the tank; the drip is now on the
 // near face and both cameras sit just south of it, ~3 m off the wall.
-const S3a = (f: number) => dolly([-1.6, D0 + 1.6, -10.5], [0.4, D0 + 1.4, -16.3], pushK(f, 360, 0.0025), { fov: 40 }); // aimed at the centre bucket kid (0.4, -14.2) so kid + bucket are in frame (was aimed between kids, the kid was cut off at the edge)
-const S3b = (f: number) => dolly([-0.8, D0 + 1.3, -10.2], [0.4, D0 + 1.1, -16.3], pushK(f, 470, 0.002), { fov: 38 });
+const S3a = (f: number) => dolly([-1.6, D0 + 1.6, -10.5], [0.4, D0 + 1.4, -16.3], pushK(f, 550, 0.0025), { fov: 40 }); // aimed at the centre bucket kid (0.4, -14.2) so kid + bucket are in frame (was aimed between kids, the kid was cut off at the edge)
+const S3b = (f: number) => dolly([-0.8, D0 + 1.3, -10.2], [0.4, D0 + 1.1, -16.3], pushK(f, 668, 0.002), { fov: 38 });
 // shot 4 (action 2, warm day): camera creeps up the tank as the sun warms. The scaffold looked west
 // along the street (look z 7/2), so the tank was never in frame; both keys now look at the tank face,
 // the look rising from y D0+2.5 to D0+9 over the 40 f glide.
-const S4a = (f: number) => dolly([10, D0 + 2.5, 6], [0, D0 + 7, -16.3], pushK(f, 585, 0.002), { fov: 44 }); // further back + lower: street at the bottom, full face, sky at the top (was still a flat brown wall at 17-23 m)
-const S4b = (f: number) => dolly([9, D0 + 3, 10], [0, D0 + 9, -16.3], pushK(f, 680, 0.0015), { fov: 46 });
+const S4a = (f: number) => dolly([10, D0 + 2.5, 6], [0, D0 + 7, -16.3], pushK(f, 778, 0.002), { fov: 44 }); // further back + lower: street at the bottom, full face, sky at the top (was still a flat brown wall at 17-23 m)
+const S4b = (f: number) => dolly([9, D0 + 3, 10], [0, D0 + 9, -16.3], pushK(f, 881, 0.0015), { fov: 46 });
 // shot 5 (snap): tank bursts -> fast pull-back with a 4-5 deg dutch roll as the wave surges down the
 // street toward the camera. Both burst cameras stand SOUTH of the tank (z +5 / +10), looking north at
 // the bursting tank and the wave surging toward the lens; the pull-back (8.8 m in 36 f, rising 4 m)
 // starts at f 834, just as the wave reaches the S5a position. The scaffold's S5a [4.5, 15, -45] sat
 // 1.3 m off the tank's south face with its view ray passing through the tank, and S5b [10, 12, -55]
 // stood north of the tank looking south through it.
-const S5a = (f: number) => dolly([6, D0 + 5, 10], [0, D0 + 2, -14], pushK(f, 810, 0.0025), { fov: 42 }); // further south + higher: the falling panel no longer fills the frame
-const S5b = (f: number) => dolly([12, D0 + 9, 15], [0, D0 + 1.5, -14], pushK(f, 834, 0.002), { fov: 46, roll: 0.08 });
+const S5a = (f: number) => dolly([6, D0 + 5, 10], [0, D0 + 2, -14], pushK(f, 1067, 0.0025), { fov: 42 }); // further south + higher: the falling panel no longer fills the frame
+const S5b = (f: number) => dolly([12, D0 + 9, 15], [0, D0 + 1.5, -14], pushK(f, 1095, 0.002), { fov: 46, roll: 0.08 });
 // shot 6 (deadpan): still aftermath, street drowned in brown, tilted train car toward the elevated
 // railway, slow push-in. The scaffold's S6a [7.5, 2.4, -25] was inside the tank AND 3.6 m below
 // ground; the camera now stands on the street at eye level, looking north-west at the drowned street.
-const S6a = (f: number) => dolly([5, D0 + 1.8, 2], [-1, D0 + 1.1, -6], pushK(f, 1020, 0.0018), { fov: 44, roll: -0.04 }); // low, close, eye-level: the waist-deep figures are 4-14 m away and read as people, not dots (was [6, 8.2, 8]: the heads were 2% of the frame)
+const S6a = (f: number) => dolly([5, D0 + 1.8, 2], [-1, D0 + 1.1, -6], pushK(f, 1357, 0.0018), { fov: 44, roll: -0.04 }); // low, close, eye-level: the waist-deep figures are 4-14 m away and read as people, not dots (was [6, 8.2, 8]: the heads were 2% of the frame)
 // shot 7 (explanation): (a) cold honey barely moving from a jar, close-up; (b) warm pour + wave slamming a wall
-const S7a = (f: number) => dolly([0.9, D0 + 1.75, -3.1], [0.55, D0 + 1.5, 0], pushK(f, 1110, 0.0025), { fov: 34 }); // pulled back, look on the jar's middle (was half out of the bottom of the frame)
-const S7b = (f: number) => dolly([7, D0 + 9, -14], [0, D0 + 1.5, 7], pushK(f, 1326, 0.002), { fov: 52, roll: -0.03 }); // south of the tank's near face (a camera at z -24 would be INSIDE the tank), wide enough to show the 10 m surge + the 26 m wall above/beside it
+const S7a = (f: number) => dolly([0.9, D0 + 1.75, -3.1], [0.55, D0 + 1.5, 0], pushK(f, 1488, 0.0025), { fov: 34 }); // pulled back, look on the jar's middle (was half out of the bottom of the frame)
+const S7b = (f: number) => dolly([7, D0 + 9, -14], [0, D0 + 1.5, 7], pushK(f, 1740, 0.002), { fov: 52, roll: -0.03 }); // south of the tank's near face (a camera at z -24 would be INSIDE the tank), wide enough to show the 10 m surge + the 26 m wall above/beside it
 // shot 8 (consequence): (a) engineer's hand stamping a blueprint "APPROVED" on a table on the street
 // (stamp point [2, D0+1, 0]); (b) wide of the rebuilt street. The scaffold's S8a [1.3, D0+1.6, -36.6]
 // and its look [2.9, D0+1.3, -31.2] were both inside the tank, and S8b [1.7, D0+1.75, -15.5] stood
 // 0.8 m off the tank face; both moved onto the street at z ~ 0 / -6.
-const S8a = (f: number) => zoom([0.6, D0 + 1.7, -2.5], [2.0, D0 + 1.0, 0], 42, pushK(f, 1500, 0.0025), { fov: 42 });
-const S8b = (f: number) => dolly([3, D0 + 2.5, 14], [0, D0 + 6, -30], pushK(f, 1640, 0.0008), { fov: 44 }); // from the street's south end looking north: cobbles lead to the ruin + tenements both sides (was 18 m from the ruin, which filled the whole frame)
+const S8a = (f: number) => zoom([0.6, D0 + 1.7, -2.5], [2.0, D0 + 1.0, 0], 42, pushK(f, 1939, 0.0025), { fov: 42 });
+const S8b = (f: number) => dolly([3, D0 + 2.5, 14], [0, D0 + 6, -30], pushK(f, 2151, 0.0008), { fov: 44 }); // from the street's south end looking north: cobbles lead to the ruin + tenements both sides (was 18 m from the ruin, which filled the whole frame)
 // shot 9 (callback): golden-hour ballpark where the tank stood, kids playing, warm haze, slow push-in to the end
-const S9a = (f: number) => dolly([PARK[0] + 0.55, D0 + 1.5, PARK[2] - 8], [PARK[0] + 0.55, D0 + 1.75, PARK[2]], pushK(f, 1785, 0.001), { fov: 40 });
-const S9b = (f: number) => dolly([PARK[0] - 1.6, D0 + 1.9, PARK[2] - 9.5], [PARK[0] + 0.4, D0 + 1.95, PARK[2]], pushK(f, 1900, 0.0015), { fov: 42 });
+const S9a = (f: number) => dolly([PARK[0] + 0.55, D0 + 1.5, PARK[2] - 8], [PARK[0] + 0.55, D0 + 1.75, PARK[2]], pushK(f, 2372, 0.001), { fov: 40 });
+const S9b = (f: number) => dolly([PARK[0] - 1.6, D0 + 1.9, PARK[2] - 9.5], [PARK[0] + 0.4, D0 + 1.95, PARK[2]], pushK(f, 2488, 0.0015), { fov: 42 });
 
 const CAMS: Record<number, Key[]> = {
   1: [
     { f: 0, s: S1a },
-    { f: 90, dur: 30, s: S1b }, // centred on 105 ("wave of syrup"), roll in
+    { f: 114, dur: 30, s: S1b }, // centred on 133 ("wave of syrup"), roll in
   ],
   2: [
-    { f: 174, s: S2a },
-    { f: 260, cut: true, s: S2b }, // cut, not a glide: the ~15 m push-in is a big jump (see S2b)
+    { f: 231, s: S2a },
+    { f: 354, cut: true, s: S2b }, // cut, not a glide: the ~15 m push-in is a big jump (see S2b)
   ],
   3: [
-    { f: 360, s: S3a }, // cut on "The tank had leaked"
-    { f: 470, dur: 30, s: S3b }, // centred on 485 ("buckets for the drips")
+    { f: 550, s: S3a }, // cut on "The tank had leaked"
+    { f: 668, dur: 30, s: S3b }, // centred on 682 ("buckets for the drips")
   ],
   4: [
-    { f: 585, s: S4a }, // cut on "The day before, it was two degrees"
-    { f: 680, dur: 40, s: S4b }, // creep up the tank on "fermented"
+    { f: 778, s: S4a }, // cut on "The day before, it was two degrees"
+    { f: 881, dur: 40, s: S4b }, // creep up the tank on "fermented"
   ],
   5: [
-    { f: 810, s: S5a }, // cut on the burst (+ big kick)
-    { f: 834, dur: 36, s: S5b }, // fast pull-back, dutch roll 0.08 rad (~4.6 deg)
+    { f: 1067, s: S5a }, // cut on the burst (+ big kick)
+    { f: 1095, dur: 36, s: S5b }, // fast pull-back, dutch roll 0.08 rad (~4.6 deg)
   ],
-  6: [{ f: 1020, s: S6a }], // cut to the still aftermath; slow push-in only
+  6: [{ f: 1357, s: S6a }], // cut to the still aftermath; slow push-in only
   7: [
-    { f: 1110, s: S7a }, // cut on "molasses is honey's slow cousin"
-    { f: 1326, cut: true, s: S7b }, // beat change (see BEAT_XFADE_AT): warm pour + wave slams the wall
+    { f: 1488, s: S7a }, // cut on "molasses is honey's slow cousin"
+    { f: 1740, cut: true, s: S7b }, // beat change (see BEAT_XFADE_AT): warm pour + wave slams the wall
   ],
   8: [
-    { f: 1500, s: S8a }, // XFADE in on "The company blamed anarchists"
-    { f: 1640, cut: true, s: S8b }, // cut to the rebuilt street on "Boston made a new rule"
+    { f: 1939, s: S8a }, // XFADE in on "The company blamed anarchists"
+    { f: 2151, cut: true, s: S8b }, // cut to the rebuilt street on "Boston made a new rule"
   ],
   9: [
-    { f: 1785, s: S9a },
-    { f: 1900, dur: 28, s: S9b }, // centred on 1914 ("you can still smell the molasses")
+    { f: 2372, s: S9a },
+    { f: 2488, dur: 28, s: S9b }, // centred on 2502 ("you can still smell the molasses")
   ],
 };
 
 // impact kicks: the image offset flips sign every frame (~3 px at 720p per unit), decays to 0 in 7 f,
 // roll +-0.23 deg per unit; they start on the first frame at/after the event. No hand-held float.
-// Rivet pops at f 750/770/790 (t 25.0/25.667/26.333 s); the tank burst at f 810 (t 27.0 s, big).
-const KICKS: [number, number][] = [[27.0, 1.6], [25.0, 0.4], [25.6667, 0.45], [26.3333, 0.5]];
+// Rivet pops at f 983/1012/1041 (t 32.772/33.723/34.712 s); the tank burst at f 1067 (t 35.574 s, big).
+const KICKS: [number, number][] = [[35.574, 1.6], [32.772, 0.4], [33.723, 0.45], [34.712, 0.5]];
 export const kickAt = (t: number) => {
   let a = 0;
   for (const [t0, g] of KICKS) {
@@ -269,16 +269,16 @@ export const keyEnd = (id: number, f: number) => {
 export type Dof = { f: number; dur?: number; cInf: number; focus?: (f: number) => V3 };
 export const DOF: Dof[] = [
   { f: 0, cInf: 12 }, // hook CU: kids sharp, tank soft behind
-  { f: 174, cInf: 0 }, // wide establishing, sharp
-  { f: 360, cInf: 13, focus: () => ANCHOR }, // drip CU (12-14), focus on the drip on the near face
-  { f: 585, cInf: 0 }, // tank creep, sharp
-  { f: 810, cInf: 0 }, // snap wide, sharp
-  { f: 1020, cInf: 11, focus: () => [-1, D0 + 1.1, -6] }, // deadpan aftermath (10-12), focus on the trapped figures / train car
-  { f: 1110, cInf: 15, focus: () => [0.55, D0 + 1.5, 0] }, // cold honey jar CU (15-16)
-  { f: 1326, cInf: 0 }, // warm pour + wave slam, sharp
-  { f: 1500, cInf: 12, focus: () => [2.0, D0 + 1.0, 0] }, // stamp CU, focus on the blueprint on the street table
-  { f: 1640, cInf: 0 }, // rebuilt street wide, sharp
-  { f: 1785, cInf: 7 }, // golden park, mild
+  { f: 231, cInf: 0 }, // wide establishing, sharp
+  { f: 550, cInf: 13, focus: () => ANCHOR }, // drip CU (12-14), focus on the drip on the near face
+  { f: 778, cInf: 0 }, // tank creep, sharp
+  { f: 1067, cInf: 0 }, // snap wide, sharp
+  { f: 1357, cInf: 11, focus: () => [-1, D0 + 1.1, -6] }, // deadpan aftermath (10-12), focus on the trapped figures / train car
+  { f: 1488, cInf: 15, focus: () => [0.55, D0 + 1.5, 0] }, // cold honey jar CU (15-16)
+  { f: 1740, cInf: 0 }, // warm pour + wave slam, sharp
+  { f: 1939, cInf: 12, focus: () => [2.0, D0 + 1.0, 0] }, // stamp CU, focus on the blueprint on the street table
+  { f: 2151, cInf: 0 }, // rebuilt street wide, sharp
+  { f: 2372, cInf: 7 }, // golden park, mild
 ];
 export const dofAt = (f: number) => {
   let i = 0; while (i + 1 < DOF.length && f >= DOF[i + 1].f) i++;
@@ -301,11 +301,11 @@ export const FOREGROUND: Fg[] = [
   // ranges stay inside one shot (world.ts shows an entry only inside its own shot, so crossfade layers never see it).
   // All kit names are procedural props from build.ts (the Kenney kit is empty).
   // hook (S1a, focus ~11.9 m): a firewood pile in the bottom-right corner at ~3.6 m.
-  { a: 0, b: 174, kit: "firewood", pos: [5.3, D0, 7.5], s: 1.0, yaw: 0.4 },
+  { a: 0, b: 231, kit: "firewood", pos: [5.3, D0, 7.5], s: 1.0, yaw: 0.4 },
   // setting wide (S2a, focus ~51 m): a lamppost at the right edge, ~17 m out, on the cobbles.
-  { a: 174, b: 360, kit: "lamppost", pos: [2.0, D0, -3.6], s: 3.5, yaw: 0 },
+  { a: 231, b: 550, kit: "lamppost", pos: [2.0, D0, -3.6], s: 3.5, yaw: 0 },
   // deadpan aftermath (S6a, focus ~10 m): a wagon wheel in the bottom-right corner at ~5 m, so the DOF blur keeps it a soft frame, not a blob.
-  { a: 1020, b: 1110, kit: "wagonWheel", pos: [2.8, D0, -2.5], s: 0.8, yaw: 0.6 },
+  { a: 1357, b: 1488, kit: "wagonWheel", pos: [2.8, D0, -2.5], s: 0.8, yaw: 0.6 },
   // golden park (S9a/b, focus 7-9.5 m): a ballpark fence in the bottom-right corner, below the kids' play.
-  { a: 1785, b: 2010, kit: "fence", pos: [69.65, D0, -79.4], s: 1.2, yaw: 0.4 },
+  { a: 2372, b: 2602, kit: "fence", pos: [69.65, D0, -79.4], s: 1.2, yaw: 0.4 },
 ];

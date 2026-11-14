@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Batch, boxGeo, quad, V, lam, buildTown, prop, Kit, Ray, kitClone } from "./build";
-import { beam, cobbleHD, grassHD, stoneHD, cloudHD, brickHD, ctex, rng } from "./paint";
+import { beam, cobbleHD, grassHD, stoneHD, cloudHD, brickHD, ctex, rng, tankSteelHD, molassesHD, rep } from "./paint";
 import { Pen } from "./toon";
 import { LIGHTS, LOOK, LightPreset } from "./lights";
 import { TONE, CHAR, twoTone, untone } from "./shade";
@@ -134,6 +134,7 @@ export class World {
   private fgs: { o: THREE.Object3D; a: number; b: number }[] = [];
   private smoke: { m: THREE.Mesh; mat: THREE.MeshLambertMaterial; top: V3; k: number }[] = [];
   private clouds: THREE.Mesh[] = [];
+  private southClouds: THREE.Sprite[] = [];
   private frustum = new THREE.Frustum();
   private m4 = new THREE.Matrix4(); private v = new THREE.Vector3(); private sph = new THREE.Sphere();
   // ---- the tank ----
@@ -145,6 +146,7 @@ export class World {
   // ---- wave + flood ----
   private molassesMat: THREE.Material;
   private waveFront: THREE.Mesh; private crest: THREE.Mesh; private crestBlobs: THREE.Mesh[] = [];
+  private crestGlint: THREE.Mesh; private surgeGlint: THREE.Mesh; private waveDrips: THREE.Mesh[] = [];
   private surgeWave: THREE.Mesh; private surgeCrest: THREE.Mesh; private surgeWall: THREE.Mesh;
   private flood: THREE.Group;
   // ---- inserts + ballpark ----
@@ -191,6 +193,21 @@ export class World {
       m.layers.set(NOINK);
       this.clouds.push(m); R.add(m);
     }
+    // v2: three low clouds due south, near the jar/blueprint cameras' view axis (x ~0, z +170..240,
+    // y 40-55, elevation ~10 deg) — those cameras look south at a low elevation and the ring clouds
+    // mostly miss their narrow horizontal fov, so the sky read as empty blue. They are SPRITES
+    // (the Mesh+lookAt version rendered as a tiny sliver in the jar frame). NOTE 2026-11-13: the
+    // sprites render in shot 7b (verified f1400-now.jpg, top-left cloud) but NOT in shot 7a under
+    // SwiftShader (--gl=swangle) — in-frame by NDC yet invisible, same as the sky sphere itself,
+    // which also rasterises as a tiny triangle there. Possibly a SwiftShader rasterisation quirk
+    // (the tablet's real GPU may render them fine); harmless either way (invisible in 7a, a real
+    // cloud in 7b). frustumCulled=false, as the sun sprites need it too.
+    for (const [cx, cy, cz, w] of [[-5, 45, 200, 140], [25, 55, 240, 180], [8, 40, 170, 120]] as const) {
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.cloudMaps.day[0], color: new THREE.Color(1.1, 1.1, 1.1), transparent: true, depthWrite: false, fog: false }));
+      m.position.set(cx, cy, cz); m.scale.set(w, w / 2, 1);
+      m.layers.set(NOINK); m.frustumCulled = false;
+      this.southClouds.push(m); R.add(m);
+    }
 
     // ---- ground (base only: the MAT owner's buildTown builds the street surface, tenements and
     // elevated railway over this; this sits 4-6 cm below D0 so it never z-fights with their street) ----
@@ -208,28 +225,65 @@ export class World {
     b.build(R);
     buildTown(R, kit, sightLines());
 
+    // ---- south skyline (v2, shot 7a/8a background): the jar and blueprint cameras look south down
+    // the street, and beyond the flood there was only dusty ground + pale sky. Low rooftops with
+    // pyramid roofs + chimneys break the horizon so no large area is one flat colour. (Shot 7b's
+    // surge looks south too: the houses peek above the brick wall, adding depth there as well.)
+    const skyline = new THREE.Group();
+    const skyR = rng(1919);
+    const skyWall = lam("skylineWall", () => ({ color: "#a87a5e" })); // light warm walls: the north faces are in shade and #8a6a58 read as flat purple-grey silhouettes
+    const skyRoof = lam("skylineRoof", () => ({ color: "#6a5248" }));
+    for (let i = 0; i < 6; i++) {
+      const w = 6 + skyR() * 5, h = 6 + skyR() * 4, x = -22 + i * 8.5 + skyR() * 3, z = 26 + skyR() * 8;
+      const house = new THREE.Mesh(new THREE.BoxGeometry(w, h, 5), skyWall);
+      house.position.set(x, D0 + h / 2, z); house.castShadow = true; skyline.add(house);
+      const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.01, w * 0.62, 2.2, 4), skyRoof); // pyramid roof
+      roof.position.set(x, D0 + h + 1.1, z); roof.rotation.y = Math.PI / 4; skyline.add(roof);
+      const chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.6, 0.5), skyRoof);
+      chim.position.set(x + w * 0.25, D0 + h + 1.6, z); skyline.add(chim);
+    }
+    R.add(skyline);
+
     // ---- the molasses: glossy dark brown (MeshPhongMaterial, shininess ~80), a WALL not water ----
     // Created up here (before the tank) because the drip streaks on the tank face use it too.
-    this.molassesMat = twoTone(new THREE.MeshPhongMaterial({ color: "#4a2c14", specular: "#9a7a4a", shininess: 80, side: THREE.DoubleSide }));
-    { // per-material shade override: the global two-tone shade is blue-violet and the additive shade
-      // lift is blue-leaning (day lift [0.05, 0.06, 0.11]); on molasses's near-black albedo the lift
-      // dominates and the whole shadowed flood read as a flat purple sheet (round 3, shot 6).
-      // Molasses in shadow stays warm dark brown. (Uniform values, not shader code, so the shared program is fine.)
-      const molShade = new THREE.Vector3(0.85, 0.5, 0.22);
-      const molLift = new THREE.Vector3(0.06, 0.03, 0.01);
-      const molOBC = this.molassesMat.onBeforeCompile;
-      this.molassesMat.onBeforeCompile = (sh, renderer) => {
+    // The HD swirl texture (paint.ts molassesHD: slow swirls, glossy amber streaks, bubbles) was
+    // painted in an earlier round but never wired in — the wave and flood read as one flat brown wall.
+    // Three variants, all with the same warm shade override (the global two-tone shade is blue-violet
+    // and the additive shade lift is blue-leaning; on molasses's near-black albedo the lift dominates
+    // and the whole shadowed flood read as a flat purple sheet, round 3 shot 6 — molasses in shadow
+    // stays warm dark brown; uniform values, not shader code, so the shared program is fine):
+    // plain for the tank drips, swirl-mapped for the wave (2 m tiles), swirl-mapped for the
+    // settled sheet (2 m tiles on the 24 x 33 m top face).
+    const molassesPhong = (map?: THREE.Texture) => {
+      const m = twoTone(new THREE.MeshPhongMaterial({ color: "#4a2c14", specular: "#b08a50", shininess: 110, side: THREE.DoubleSide, ...(map ? { map } : {}) })); // v2: specular #9a7a4a -> #b08a50, shininess 80 -> 110 (stronger wet sheen); lift raised so the swirls read in shade
+      const molOBC = m.onBeforeCompile;
+      m.onBeforeCompile = (sh, renderer) => {
         molOBC(sh, renderer);
-        sh.uniforms.uShadeCol = { value: molShade };
-        sh.uniforms.uShadeLift = { value: molLift };
+        sh.uniforms.uShadeCol = { value: new THREE.Vector3(0.85, 0.5, 0.22) };
+        sh.uniforms.uShadeLift = { value: new THREE.Vector3(0.10, 0.05, 0.02) };
       };
-    }
+      return m;
+    };
+    this.molassesMat = molassesPhong();
+    const molWaveTex = rep(molassesHD(), 9, 2); // 2 m tiles on the 18 m front face / top slope
+    molWaveTex.wrapS = molWaveTex.wrapT = THREE.RepeatWrapping;
+    const molassesWaveMat = molassesPhong(molWaveTex);
+    const molSheetTex = rep(molassesHD(), 12, 16); // 2 m tiles on the 24 x 33 m flood sheet
+    molSheetTex.wrapS = molSheetTex.wrapT = THREE.RepeatWrapping;
+    const molassesSheetMat = molassesPhong(molSheetTex);
 
     // ---- the tank (hero object): brown-painted steel, rivet bands, drip streaks on the near face ----
     // Warm albedo + low two-tone lift (0.3): the two-tone shade is blue-violet, and the tank's camera-facing
     // side is at grazing sun in most shots — with the stock lift the brown went mauve-grey (still f200).
-    const tankMat = twoTone(new THREE.MeshLambertMaterial({ color: "#8a5a30" }), 0.3);
-    const tankDS = twoTone(new THREE.MeshLambertMaterial({ color: "#8a5a30", side: THREE.DoubleSide }), 0.3);
+    // tankSteelHD (paint.ts: 6 x 3 m tile — plate seams, painted rivets, drip streaks, rust weep) was
+    // painted in an earlier round but never wired in: the shell was one flat #8a5a30 gradient filling
+    // ~70% of the frame in shots 3-4. 86 m circumference / 6 m = 14 tiles around, 15.2 m / 3 m = 5 up.
+    // The 3D rivet studs stay: they give real relief over the painted rows. The torn shell / panels
+    // (tankDS) keep a flat rusty-interior colour — the inside was unpainted.
+    const tankTex = rep(tankSteelHD(), 14, 5);
+    tankTex.wrapS = tankTex.wrapT = THREE.RepeatWrapping;
+    const tankMat = twoTone(new THREE.MeshLambertMaterial({ map: tankTex }), 0.3);
+    const tankDS = twoTone(new THREE.MeshLambertMaterial({ color: "#6a4526", side: THREE.DoubleSide }), 0.3);
     const tankDark = twoTone(new THREE.MeshLambertMaterial({ color: "#5a3a20" }), 0.3);
     const tankGroup = new THREE.Group();
     tankGroup.position.set(TANK.x, D0, TANK.z);
@@ -262,13 +316,21 @@ export class World {
     // tint made them read as blue bars). Wet molasses, warm brown with a specular sheen.
     const dripMat = this.molassesMat;
     this.streaks = new THREE.Group();
-    for (const [x, len] of [[-6.5, 2.2], [-4.2, 1.4], [-2.4, 2.8], [-0.9, 1.8], [0.8, 2.4], [2.6, 1.5], [4.4, 2.6], [6.2, 1.7]] as const) {
+    // v2: 8 -> 15 runs off the y = 3.9 rivet row (varied widths) + a second shorter row off the
+    // y = 6.6 row — shot 3's leak close-up reads on these as well as the base row
+    for (const [x, len, w] of [[-6.5, 2.2, 0.14], [-5.4, 3.1, 0.1], [-4.2, 1.4, 0.14], [-3.3, 2.0, 0.08], [-2.4, 2.8, 0.14], [-1.6, 1.2, 0.1], [-0.9, 1.8, 0.14], [0.2, 2.9, 0.09], [0.8, 2.4, 0.14], [1.9, 1.3, 0.1], [2.6, 1.5, 0.14], [3.5, 2.2, 0.08], [4.4, 2.6, 0.14], [5.6, 1.9, 0.1], [6.2, 1.7, 0.14]] as const) {
       const z = Math.sqrt(TANK.r * TANK.r - x * x) + 0.03;
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.14, len, 0.05), dripMat);
+      const s = new THREE.Mesh(new THREE.BoxGeometry(w, len, 0.05), dripMat);
       s.position.set(x, 3.9 - len / 2, z);
       this.streaks.add(s);
     }
-    for (const x of [-2.4, 0.8, 4.4]) { // a fat drip blob at the bottom of three streaks
+    for (const [x, len] of [[-5.8, 1.6], [-3.0, 1.1], [-0.2, 1.9], [3.0, 1.2], [5.2, 1.7]] as const) {
+      const z = Math.sqrt(TANK.r * TANK.r - x * x) + 0.03;
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.1, len, 0.05), dripMat);
+      s.position.set(x, 6.6 - len / 2, z);
+      this.streaks.add(s);
+    }
+    for (const x of [-5.4, -2.4, 0.2, 0.8, 4.4]) { // a fat drip blob at the bottom of five streaks
       const z = Math.sqrt(TANK.r * TANK.r - x * x) + 0.05;
       const d = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), dripMat);
       d.scale.set(1, 1.7, 0.7); d.position.set(x, 1.15, z);
@@ -333,26 +395,45 @@ export class World {
       quad(V(-9, 0, 0), V(-9, 0, 1), V(-9, 4.5, 1), V(-9, 1, 0)), // left flank
       quad(V(9, 0, 1), V(9, 0, 0), V(9, 1, 0), V(9, 4.5, 1)), // right flank
     ];
-    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), this.molassesMat);
+    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), molassesWaveMat);
     this.waveFront.castShadow = true; this.waveFront.receiveShadow = true; this.waveFront.visible = false;
     R.add(this.waveFront);
-    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), this.molassesMat);
+    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), molassesWaveMat);
     this.crest.rotation.z = Math.PI / 2; this.crest.castShadow = true; this.crest.visible = false;
     R.add(this.crest);
-    for (let i = 0; i < 5; i++) { // lumpy crest blobs riding the front
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), this.molassesMat);
-      b.scale.set(1, 0.75, 1); b.castShadow = true; b.visible = false;
+    // lumpy crest blobs riding the front — irregular sizes (r 0.9-1.8 m) so the crest line breaks
+    // instead of reading as one straight roll (the old five identical r 0.9 blobs barely poked
+    // 0.13 m above the crest top). x offsets + radii ride in userData for poseWave.
+    for (const [bx, br] of [[-8, 1.5], [-5.5, 1.0], [-2.5, 1.8], [0, 0.9], [2.5, 1.3], [5.5, 1.6], [8, 1.1]] as const) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), molassesWaveMat);
+      b.scale.set(br, 0.75 * br, br); b.castShadow = true; b.visible = false;
+      b.userData.bx = bx; b.userData.br = br;
       this.crestBlobs.push(b); R.add(b);
+    }
+    // glossy highlight band along the crest's sunlit lip + drips hanging off the leading edge:
+    // the crest reads as wet syrup catching the sun, and the front edge is no longer one hard line
+    const glintMat = new THREE.MeshPhongMaterial({ color: "#c8862a", specular: "#ffe0a0", shininess: 140, emissive: "#2e1c06" });
+    this.crestGlint = new THREE.Mesh(new THREE.BoxGeometry(17.5, 0.22, 0.5), glintMat);
+    this.crestGlint.castShadow = true; this.crestGlint.visible = false;
+    R.add(this.crestGlint);
+    for (const dx of [-8, -5, -2, 1.5, 4.5, 7.5] as const) {
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), molassesWaveMat);
+      d.scale.set(1, 1.9, 0.8); d.castShadow = true; d.visible = false;
+      d.userData.dx = dx;
+      this.waveDrips.push(d); R.add(d);
     }
     // ---- shot 7b surge (f 1305-1500 only): the same wave wedge + crest, re-surging against a
     // brick wall at the south end of the street (z = +7); the shot-5 wave above is untouched ----
-    this.surgeWave = new THREE.Mesh(this.waveFront.geometry, this.molassesMat);
+    this.surgeWave = new THREE.Mesh(this.waveFront.geometry, molassesWaveMat);
     this.surgeWave.castShadow = true; this.surgeWave.receiveShadow = true; this.surgeWave.visible = false;
     R.add(this.surgeWave);
-    this.surgeCrest = new THREE.Mesh(this.crest.geometry, this.molassesMat);
+    this.surgeCrest = new THREE.Mesh(this.crest.geometry, molassesWaveMat);
     this.surgeCrest.rotation.z = Math.PI / 2; this.surgeCrest.scale.set(1, 0.55, 1); // shorter than the shot-5 crest (10 m, not 18.5 m): the wall shows on both sides. NB: length is local Y after the z-rotation.
     this.surgeCrest.castShadow = true; this.surgeCrest.visible = false;
     R.add(this.surgeCrest);
+    this.surgeGlint = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.22, 0.5), glintMat); // same wet lip on the surge crest
+    this.surgeGlint.castShadow = true; this.surgeGlint.visible = false;
+    R.add(this.surgeGlint);
     const wallTex = brickHD().clone(); // brick courses on the surge wall (a clone: its repeat must not touch the cached texture the tenements use)
     wallTex.needsUpdate = true; wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(6.5, 1.5); // ~0.25 m bricks on the 26 x 6 m wall
     const brickMat = twoTone(lam("brickWall", () => ({ map: wallTex }))); // warm brick (was flat #7a4636 plain Lambert: read as a purple slab in shade)
@@ -372,7 +453,7 @@ export class World {
     R.add(this.surgeWall);
     // ---- settled flood (shots 6-9): 2-3 ft deep glossy sheet over the street, with debris ----
     this.flood = new THREE.Group();
-    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), this.molassesMat);
+    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), molassesSheetMat);
     sheet.receiveShadow = true;
     this.flood.add(sheet);
     const wheel = new THREE.Group(); // tilted wagon wheel, half-sunk
@@ -409,6 +490,25 @@ export class World {
       pl.position.set(x, D0 + 0.78, z); pl.rotation.y = yaw; pl.castShadow = true;
       this.flood.add(pl);
     }
+    // bubble clusters on the settled flood: small glossy domes half-sunk in the sheet top, so the
+    // flood surface catches the light instead of reading as one flat brown plane
+    const bubR = rng(1640);
+    for (let i = 0; i < 10; i++) {
+      const r = 0.12 + bubR() * 0.22;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), molassesWaveMat);
+      b.scale.y = 0.55;
+      b.position.set(-10 + bubR() * 20, D0 + 0.72, -16 + bubR() * 28);
+      b.castShadow = true;
+      this.flood.add(b);
+    }
+    const hat = new THREE.Group(); // a lost bowler hat floating in the flood (shot-6 storytelling detail)
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.02, 14), tankDark);
+    hat.add(brim);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), tankDark);
+    crown.position.y = 0.01; hat.add(crown);
+    hat.position.set(1.5, D0 + 0.78, 6); hat.rotation.set(0.1, 0.7, 0.08);
+    hat.traverse((o) => { o.castShadow = true; });
+    this.flood.add(hat);
     this.flood.visible = false;
     R.add(this.flood);
 
@@ -426,14 +526,39 @@ export class World {
     honeyBody.position.set(0, 0.95 + 0.15, 0); this.honeyTable.add(honeyBody);
     const honeyTop = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.145, 0.02, 20), honeyMat);
     honeyTop.position.set(0, 0.95 + 0.28, 0); this.honeyTable.add(honeyTop);
-    const dipper = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), M.wood);
-    dipper.position.set(-0.2, 1.15, 0.12); dipper.rotation.z = 0.35; dipper.rotation.x = -0.2;
+    // the dipper was a thin dark stick that read as floating purple against the sky: thicker,
+    // warm honey-wood, leaning on the jar rim so its tip touches the table. Warm shade override:
+    // a thin stick in the global blue-violet two-tone shade reads as a purple bar.
+    const dipperMat = twoTone(new THREE.MeshLambertMaterial({ color: "#8a5a28" }));
+    {
+      const dOBC = dipperMat.onBeforeCompile;
+      dipperMat.onBeforeCompile = (sh, renderer) => {
+        dOBC(sh, renderer);
+        sh.uniforms.uShadeCol = { value: new THREE.Vector3(0.85, 0.5, 0.22) };
+        sh.uniforms.uShadeLift = { value: new THREE.Vector3(0.06, 0.03, 0.01) };
+      };
+    }
+    const dipper = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), dipperMat);
+    dipper.position.set(-0.22, 1.12, 0.1); dipper.rotation.z = 0.5; dipper.rotation.x = -0.2;
     this.honeyTable.add(dipper);
+    // secondary detail so the table isn't one flat brown plane: a folded cloth under the jar,
+    // a spoon, and a few crumbs
+    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.4), lam("clothCream", () => ({ color: "#e8ddc4" })));
+    cloth.position.set(0, 0.955, 0); cloth.rotation.y = 0.15; this.honeyTable.add(cloth);
+    const spoon = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.015, 0.22), lam("spoonSteel", () => ({ color: "#b8bcc4" })));
+    spoon.position.set(0.32, 0.96, -0.18); spoon.rotation.y = 0.5; this.honeyTable.add(spoon);
+    const crumbMat = lam("crumb", () => ({ color: "#5a3a20" }));
+    const crumbR = rng(77);
+    for (let i = 0; i < 5; i++) {
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), crumbMat);
+      c.position.set(-0.3 + crumbR() * 0.6, 0.958, -0.2 + crumbR() * 0.35);
+      this.honeyTable.add(c);
+    }
     this.honeyDrip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), honeyMat); // cold honey oozing over the rim
     this.honeyDrip.position.set(0, 1.24, -0.17);
     this.honeyTable.add(this.honeyDrip);
     this.honeyPool = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), honeyMat);
-    this.honeyPool.scale.set(1, 0.25, 1); this.honeyPool.position.set(0.24, 0.96, 0.1);
+    this.honeyPool.scale.set(1, 0.25, 1); this.honeyPool.position.set(0.32, 0.96, 0.12); // off the cloth, on bare wood
     this.honeyTable.add(this.honeyPool);
     this.honeyTable.traverse((o) => { o.castShadow = true; });
     this.honeyTable.visible = false;
@@ -454,6 +579,14 @@ export class World {
     stampHandle.position.y = 0.1; stamp.add(stampHandle);
     stamp.position.set(0.62, 0.97, 0.18); stamp.rotation.z = 0.45; // resting tilted on the table, base touching (was 1.25 rad, floating)
     this.blueTable.add(stamp);
+    // a second sheet askew under the blueprint + a pencil, so the table isn't one flat plane
+    const bp2 = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.45), new THREE.MeshBasicMaterial({ map: blueprintTex() }));
+    bp2.rotation.x = -Math.PI / 2; bp2.rotation.z = Math.PI + 0.35;
+    bp2.position.set(-0.15, 0.955, -0.05);
+    this.blueTable.add(bp2);
+    const pencil = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.2, 6), lam("pencilYellow", () => ({ color: "#e8a83a" })));
+    pencil.rotation.z = Math.PI / 2; pencil.rotation.y = 0.4; pencil.position.set(0.1, 0.96, 0.32);
+    this.blueTable.add(pencil);
     this.blueTable.traverse((o) => { o.castShadow = true; });
     this.blueTable.visible = false;
     R.add(this.blueTable);
@@ -590,28 +723,35 @@ export class World {
   /** wave: leading edge advances z -16 -> +15 over shot 5 (f 810-1020), 4.5 m tall at the front, tapering behind */
   private poseWave(f: number) {
     const on = f >= BURST_F && f < WAVE_END_F;
-    this.waveFront.visible = on; this.crest.visible = on;
+    this.waveFront.visible = on; this.crest.visible = on; this.crestGlint.visible = on;
     for (const b of this.crestBlobs) b.visible = on;
+    for (const d of this.waveDrips) d.visible = on;
     if (on) {
       const u = smooth((f - BURST_F) / (WAVE_END_F - BURST_F));
       const frontZ = -16 + 31 * u, backZ = -16 - 1.5 * u;
       this.waveFront.scale.z = Math.max(0.01, frontZ - backZ);
       this.waveFront.position.set(0, D0, backZ);
       this.crest.position.set(0, D0 + 4.4, frontZ - 0.4);
+      this.crestGlint.position.set(0, D0 + 4.95, frontZ + 0.05); // rides the crest's front-top edge
       this.crestBlobs.forEach((b, i) => {
-        b.position.set(-7 + i * 3.5, D0 + 4.55 + 0.15 * Math.sin(f * 0.12 + i * 1.7), frontZ - 0.7);
+        const br = (b.userData.br as number) ?? 1;
+        b.position.set((b.userData.bx as number) ?? -7 + i * 3.5, D0 + 4.5 + 0.6 * br + 0.15 * Math.sin(f * 0.12 + i * 1.7), frontZ - 0.7);
+      });
+      this.waveDrips.forEach((d, i) => {
+        d.position.set((d.userData.dx as number) ?? 0, D0 + 3.9 + 0.12 * Math.sin(f * 0.15 + i * 1.3), frontZ + 0.15);
       });
     }
     // shot 7b surge only: the wedge re-surges south and slams the brick wall at z = +7 —
     // front advances z -2 -> +7 over f 1305-1500, piling up ~25% taller as it hits the wall
     const on7b = f >= SURGE_A_F && f < SURGE_B_F;
-    this.surgeWave.visible = on7b; this.surgeCrest.visible = on7b; this.surgeWall.visible = on7b;
+    this.surgeWave.visible = on7b; this.surgeCrest.visible = on7b; this.surgeWall.visible = on7b; this.surgeGlint.visible = on7b;
     if (on7b) {
       const u = smooth((f - SURGE_A_F) / (SURGE_B_F - SURGE_A_F));
       const frontZ = -2 + 9 * u, backZ = frontZ - (3 + 6 * u), lift = 1 + 0.25 * u;
       this.surgeWave.scale.set(0.55, lift, Math.max(0.01, frontZ - backZ)); // 10 m wide, not 18 m: the brick wall shows on both sides of the surge
       this.surgeWave.position.set(0, D0, backZ);
       this.surgeCrest.position.set(0, D0 + 4.5 * lift - 0.1, frontZ - 0.4);
+      this.surgeGlint.position.set(0, D0 + 4.5 * lift + 0.45, frontZ + 0.05);
     }
   }
 
@@ -672,6 +812,10 @@ export class World {
       const m = this.clouds[i], mat = m.material as THREE.MeshBasicMaterial;
       m.lookAt(cam.position.x, m.position.y, cam.position.z);
       mat.map = this.cloudMaps[s.light][i % 4];
+    }
+    // south clouds are Sprites: they face the camera in-shader, no lookAt; only the map swaps per shot.
+    for (let i = 0; i < this.southClouds.length; i++) {
+      (this.southClouds[i].material as THREE.SpriteMaterial).map = this.cloudMaps[s.light][(i + 9) % 4];
     }
     // ---- foreground framing objects: inside their frames AND their own shot (so a crossfade layer never shows them) ----
     for (const g of this.fgs) g.o.visible = f >= g.a && f < g.b && g.a < s.b && g.b > s.a;

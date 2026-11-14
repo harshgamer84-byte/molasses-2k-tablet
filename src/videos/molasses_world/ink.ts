@@ -1,7 +1,9 @@
 // Ink outlines for the 3D world, matched to the reference measurements (references/reports/outlines.md recipe,
-// post-agent changes: widths scale with the output height (pxScale = height / 1920, so 5.1 px at 1080x1920 is
-// 6.8 px at 1440x2560), RMAX 9 for headroom at 1440, fog-tinted ink (scene.fog, x0.3), `noInkFallback` below.
+// post-agent changes: widths scale with the output height (pxScale = height / 1920, so 6.0 px at 1080x1920 is
+// 8.0 px at 1440x2560), RMAX 12 for headroom at 1440, fog-tinted ink (scene.fog, x0.15), `noInkFallback` below.
 // Round 2: widths x1.5 (5.1 -> 3.3 px from 6 to 90 m), pure near-black #030303, far opacity 0.95, depth jumps from 1 %.
+// v2 (2026-11-13): widths 6.0 -> 4.5 px, creases as wide as silhouettes, shallower depth/angle triggers, far
+// opacity 1.0, fog tint 0.15 — see DEF below. The toy-scene EW numbers at the bottom of this header are pre-v2.
 //
 // How it works
 //  1. Re-render the WORLD ONLY (camera layer 0) into a non-MSAA target: view-space normal (rgb), coverage (a) and
@@ -49,10 +51,16 @@ export type InkOptions = {
 const DEF: Required<InkOptions> = {
   // round 2 (reviewer: "world outlines ~1.5x thicker, pure black on every silhouette"): widths x1.5 (creases follow
   // via creaseScale), pure near-black, far opacity 0.75 -> 0.95; fog tint of the ink 0.6 -> 0.3 (compMat fogInk)
+  // v2 (2026-11-13, user: "dark ink lines are missing for houses and stuff" — wide shots read line-less):
+  // widths up again (6.0 -> 4.5 px at 1080x1920 = 8.0 -> 6.0 px at 1440x2560; RMAX raised 9 -> 12 to cover),
+  // creases as wide as silhouettes (creaseScale 0.8 -> 1.0), shallower triggers so wall steps / sills / tank
+  // bands fire (depthLo 0.01 -> 0.006, depthHi 0.03 -> 0.02; crease angles 35/50 -> 28/42 deg), concave
+  // folds stronger (0.7 -> 0.9), lines stay full strength at distance (farOpacity 0.95 -> 1.0, reference
+  // lines are nearly constant with distance). Characters stay on NOINK — this pass never touches them.
   color: "#030303", strength: 1.0,
-  widthNear: 5.1, widthFar: 3.3, distNear: 6, distFar: 90, creaseScale: 0.8, // round 3: creases 0.64 -> 0.8 (building corners)
-  depthLo: 0.01, depthHi: 0.03, angleLo: 35, angleHi: 50, concaveGain: 0.7, // depth jumps from 1 %; creases from 35 deg (roof eaves)
-  farOpacity: 0.95, fadeNear: 150, fadeFar: 450,
+  widthNear: 6.0, widthFar: 4.5, distNear: 6, distFar: 90, creaseScale: 1.0,
+  depthLo: 0.006, depthHi: 0.02, angleLo: 28, angleHi: 42, concaveGain: 0.9,
+  farOpacity: 1.0, fadeNear: 150, fadeFar: 450,
 };
 
 const FS_VERT = /* glsl */ `
@@ -123,7 +131,7 @@ varying vec2 vUv;
 // pixel steps along x, y and both diagonals, and their length in px
 const vec2 STEP[4] = vec2[4](vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, -1.0));
 const float SLEN[4] = float[4](1.0, 1.0, 1.41421, 1.41421);
-#define RMAX 9   // covers 5.1 px x pxScale 1.333 = 6.8 px at 1440x2560 (+0.5 AA ramp)
+#define RMAX 12   // v2: covers 6.0 px x pxScale 1.333 = 8.0 px at 1440x2560 (+0.5 AA ramp)
 
 // textureLod: explicit LOD inside loops (nearest-filtered targets, no derivatives needed)
 float dist(sampler2D t, vec2 uv) { return -perspectiveDepthToViewZ(textureLod(t, uv, 0.0).x, cNear, cFar); }
@@ -288,7 +296,7 @@ export class InkPass extends Pass {
     this.compMat = fs(COMP_FRAG, {
       inputBuffer: { value: null }, tMask: { value: this.maskRT.texture }, tNormal: { value: this.rt.texture },
       texel: { value: texel }, inkColor: { value: new THREE.Color(o.color) }, debug: { value: 0 },
-      fogColor: { value: new THREE.Color() }, fogInk: { value: 0.3 },
+      fogColor: { value: new THREE.Color() }, fogInk: { value: 0.15 },
     });
     this.copyMat = fs(COPY_FRAG, { tSrc: { value: this.tmpRT.texture } });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.maskMat);

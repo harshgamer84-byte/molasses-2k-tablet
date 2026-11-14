@@ -16,10 +16,10 @@ export const LIGHTS: Record<"day" | "golden", LightPreset> = {
   day: {
     az: 75, el: 48,
     // WORLD (2026-11-01): nudged slightly cooler for a January Boston day — lit less warm, shade a touch bluer.
-    lit: [1.56, 1.5, 1.38], shade: [0.3, 0.29, 0.38], lift: [0.05, 0.06, 0.11], lambert: 0.35, sideK: 0.84, term: 0.2,
+    lit: [1.56, 1.5, 1.38], shade: [0.3, 0.29, 0.38], lift: [0.05, 0.06, 0.11], lambert: 0.35, sideK: 0.84, term: 0.15, // v2: term 0.2 -> 0.15, crisper sun terminator (more graphic two-tone, closer to the ref)
     charTint: [1.0, 0.94, 0.92], charShade: 0.86, charGrad: 0.07, bodyGrad: 0.2, sideTint: [0.92, 0.90, 0.96],
     blob: [0.62, 0.58, 0.58], actorShadow: false,
-    top: "#3e7fd2", hor: "#b8d0ec", skyCurve: [0.0, 0.5, 0.6], fog: "#b8d0ec", fogNear: 25, fogFar: 300, sunDisc: "#000000",
+    top: "#3e7fd2", hor: "#9fb6e6", skyCurve: [0.0, 0.5, 0.6], fog: "#9fb6e6", fogNear: 25, fogFar: 300, sunDisc: "#000000", // v2: horizon/fog #b8d0ec -> #9fb6e6 (the pale horizon washed the jar shot's sky; matches depth.md 2.2)
     sunCol: "#fff3e0", sunI: 2.8, sky: "#dcecff", ground: "#b49a78", hemiI: 0.55,
     bias: -0.00025, normalBias: 0.015,
   },
@@ -46,11 +46,12 @@ export type WorldLook = {
 export const LOOK: Record<"day" | "golden", WorldLook> = {
   day: {
     // depth.md 2.2: horizon #9fb6e6 just above the skyline, upper sky #5e93d9 at ~20 deg (grade: frame top #5997e2)
-    sky: { c: ["#b8d0ec", "#9cbfea", "#6a9fe0", "#4f8cdb", "#3373cc"], e: [0, 3, 8, 16, 40] },
+    // v2: the two lowest stops were #b8d0ec/#9cbfea — paler than this note, and the jar shot's sky read as empty blue
+    sky: { c: ["#9fb6e6", "#8fb4e2", "#6a9fe0", "#4f8cdb", "#3373cc"], e: [0, 3, 8, 16, 40] },
     water: { near: "#22a7b6", mid: "#167fb2", far: "#1a5596", crest: "#7ddfe8", trough: "#0e4a80", glint: "#ffffff", shade: [0.5, 0.56, 0.72] },
     cloud: { lit: "#fbf8f1", mid: "#e1e5f3", shade: "#c3cbe9" },
     bounce: [0, 0, 0],
-    sat: 1.08,
+    sat: 1.15, // v2: 1.08 -> 1.15, a touch more world-albedo saturation toward the ref's deep colour
   },
   golden: {
     // sunset, not dusk: #ffd08a horizon, peach/orange through ~10 deg, warm rose at 20, muted warm mauve only near the top

@@ -201,7 +201,7 @@ const person = (cam: CamInfo, who: Who, x: number, y: number, z: number, view: {
 };
 
 /** ground shadow under a standing / sitting card (review rounds 2-4), multiply, blue-violet: a TIGHT contact pool right under
- *  the feet (~.5 on screen at the core) so nobody floats, plus by day (cards cast no real shadow) a lighter soft tail
+ *  the feet (~.6 on screen at the core, widened in the v2 rework so the pool reads) so nobody floats, plus by day (cards cast no real shadow) a lighter soft tail
  *  stretched AWAY from the sun, length ~1.6 m / tan(sun elevation), capped. Golden: world.ts casts real card shadows. */
 const CONTACT: Record<"day" | "golden", [number, number, number]> = { day: [0.2, 0.21, 0.33], golden: [0.24, 0.2, 0.33] };
 const TAIL: [number, number, number] = [0.42, 0.44, 0.62];
@@ -218,7 +218,33 @@ const blob = (out: Stage, x: number, y: number, z: number, sc = 1, k = 1) => {
   }
   const cc = hexOf(CONTACT[LNAME], k);
   out.fx.push({ key: `blob|contact|${cc}`, cw: 128, ch: 128, draw: (p) => fxContact(p, cc), x: x + ox * 0.03 * sc, y: y + 0.022, z: z + oz * 0.03 * sc,
-    w: 0.52 * sc, h: 0.4 * sc, flat: true, rot });
+    w: 0.62 * sc, h: 0.48 * sc, flat: true, rot });
+};
+
+// ---------------- molasses v2: dressing + grounding ----------------
+// Bold period caps (red / blue / green / amber) so the crowd pops against the
+// pale grade, like the reference's hat-forward people (chef toque, captain cap).
+const BOLD_CAPS = ["#c0353a", "#3f6fb5", "#5d7a3a", "#d9a441"];
+// Molasses that coats the lower body of a flood victim, drawn on the person's own
+// card (so it rides the card, no extra mesh): wavy liquid top edge, a lighter
+// glossy rim and two highlight pools — never a straight slice.
+const MOL = "#4a2c14"; // world molasses material colour (world.ts)
+const MOL_HI = "#6b4226"; // glossy rim / highlight (the bucket's molasses colour)
+/** molasses over the lower body, from design-y `topY` (the waist) to the soles.
+ *  The band hugs the body — full card width would paint the street behind the
+ *  legs: ~108 half-width in front view, ~80 in side view, widening slightly
+ *  toward the soles where it pools. */
+const molassesOver = (p: Pen, topY: number, side: boolean) => {
+  const cx = 300, half = side ? 80 : 108;
+  const top: [number, number][] = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    top.push([cx - half + 2 * half * t, topY + 9 * Math.sin(t * Math.PI * 2.5)]);
+  }
+  p.poly([...top, [cx + half + 20, 975], [cx - half - 20, 975]], MOL, 0);
+  p.stroke(top, 5, MOL_HI);
+  p.ell(cx - 42, topY + 46, 26, 9, MOL_HI, 0);
+  p.ell(cx + 56, topY + 78, 18, 7, MOL_HI, 0);
 };
 
 // ---------------- crowd by shot ----------------
@@ -334,7 +360,10 @@ const puddle = (p: Pen) => { p.ell(150, 75, 140, 58, "#6f97c6", 0); p.ell(120, 6
  *  Standing only (no foot-slide): the cameras move, the people watch. Flat caps, shawls, aprons. */
 const neighbours = (cam: CamInfo, t: number, out: Stage, spots: [number, number][]) => {
   spots.forEach(([x, z], i) => {
-    const o = neighbour(i), who: Who = { i: i + 300, o, okey: `n${i % 6}` };
+    // every third neighbour is a townsfolk (tophat / bonnet, saturated coat) so the
+    // sidewalk crowd reads as 1919 Boston, not a row of identical muted caps
+    const town = i % 3 === 0;
+    const o = town ? townsfolk(i) : neighbour(i), who: Who = { i: i + 300, o, okey: town ? `t${i % 6}` : `n${i % 6}` };
     const expr: Expr = i % 4 === 3 ? "smile" : "neutral";
     const blink = lidAt(t, i + 300);
     out.places.push(person(cam, who, x, D0, z, { side: false, mirror: false },
@@ -351,17 +380,21 @@ const townsfolkAt = (cam: CamInfo, t: number, out: Stage) => {
 /** "street" (shots 1-4): Antonio + Maria gathering firewood near the camera; from shot 2, bucket kids
  *  at the tank's near face (z ≈ -14) and neighbours on the sidewalks. */
 const street = (id: number, t: number, cam: CamInfo, out: Stage) => {
-  out.places.push(person(cam, { i: 1, o: ANTONIO, okey: "antonio" }, 0.6, D0, 1.2, { side: false, mirror: false },
-    { mode: "stand", expr: "neutral", prop: "firewood", blink: lidAt(t, 1) }, {}, 0.78));
+  // Antonio: RED cap (was muted #5a4632) + grin — the reference crowd pops a red
+  // accent, and the lead kid reads cheerful, not blank.
+  out.places.push(person(cam, { i: 1, o: { ...ANTONIO, cap: "#c0353a" }, okey: "antonio" }, 0.6, D0, 1.2, { side: false, mirror: false },
+    { mode: "stand", expr: "grin", prop: "firewood", blink: lidAt(t, 1) }, {}, 0.78));
   blob(out, 0.6, D0, 1.2, 0.78);
-  out.places.push(person(cam, { i: 2, o: MARIA, okey: "maria" }, -0.8, D0, 1.9, { side: false, mirror: false },
-    { mode: "stand", expr: "smile_closed", blink: lidAt(t, 2) }, {}, 0.72));
+  // Maria: straw BONNET (was loose hair) + open smile — a 1919 silhouette.
+  out.places.push(person(cam, { i: 2, o: { ...MARIA, hat: "bonnet" }, okey: "maria" }, -0.8, D0, 1.9, { side: false, mirror: false },
+    { mode: "stand", expr: "smile", blink: lidAt(t, 2) }, {}, 0.72));
   blob(out, -0.8, D0, 1.9, 0.72);
   if (id >= 2) {
     const kids: [number, number][] = [[-2.2, -13.6], [0.4, -14.2], [2.4, -13.4]];
     kids.forEach(([x, z], k) => {
-      const expr: Expr = k === 1 ? "grin" : k === 0 ? "smile" : "neutral";
-      out.places.push(person(cam, { i: 10 + k, o: bucketKid(k), okey: `bk${k}` }, x, D0, z, { side: false, mirror: false },
+      // bold caps + livelier faces (was muted caps, third kid neutral)
+      const expr: Expr = (["grin", "laugh", "smile"] as Expr[])[k];
+      out.places.push(person(cam, { i: 10 + k, o: { ...bucketKid(k), cap: BOLD_CAPS[k] }, okey: `bk${k}c${k}` }, x, D0, z, { side: false, mirror: false },
         { mode: "stand", expr, prop: "bucket", blink: lidAt(t, 10 + k) }, {}, 0.75));
       blob(out, x, D0, z, 0.75);
     });
@@ -373,27 +406,52 @@ const street = (id: number, t: number, cam: CamInfo, out: Stage) => {
  *  Staggered starts (0-2.2 s after the burst), 2.8-4.0 m/s, panic faces, run cycle (bigger lean, faster
  *  bob). They hold at the far edge (z = 11) still running rather than popping back to the tank. */
 const flee = (cam: CamInfo, t: number, out: Stage) => {
+  // the wave front, same formula as world.ts waveFront: the molasses reaches z = +15 at f 1020
+  const f = Math.round(t * FPS);
+  const frontZ = -16 + 31 * smooth((f - 810) / 210);
   for (let i = 0; i < 20; i++) {
     const delay = hh(i, 31) * 2.2, z0 = -15 + hh(i, 32) * 8, sp = 2.8 + hh(i, 33) * 1.2;
     const run = Math.max(0, t - SNAP - delay);
     const z = Math.min(z0 + sp * run, 11);
     const x = -6 + hh(i, 34) * 12 + Math.sin(t * 0.9 + i) * 0.4;
     const kid = i % 3 === 2;
-    // cap/jacket outfits only: dresses have no run stride, so no dress outfits in the fleeing crowd
-    const o = kid ? bucketKid(i % 4) : neighbour((i % 3) * 2);
-    const who: Who = { i: 400 + i, o, okey: kid ? `bk${i % 4}` : `n${((i % 3) * 2) % 6}` };
+    // cap/jacket outfits only: dresses have no run stride, so no dress outfits in the fleeing crowd.
+    // Hats are mixed now: tophat men (townsfolk, even v) every fourth adult, bold caps otherwise —
+    // the fleeing crowd is not a row of identical muted caps.
+    const town = !kid && i % 4 === 0;
+    const o = kid ? { ...bucketKid(i % 4), cap: BOLD_CAPS[i % 4] }
+      : town ? townsfolk(i) : { ...neighbour((i % 3) * 2), cap: BOLD_CAPS[i % 4] };
+    const who: Who = { i: 400 + i, o, okey: kid ? `bk${i % 4}c${i % 4}` : town ? `t${i % 6}` : `n${((i % 3) * 2) % 6}c${i % 4}` };
     const running = run > 0;
     const phase = q(((run * sp) / 1.6 + hh(i, 35)) % 1, 120);
     const blink = lidAt(t, 400 + i);
     const view = viewOf(cam, x, z, 0, 1);
+    // panic faces look left / centre / right so the crowd is not one repeated face
+    const look = (i % 3) - 1;
     const fo: FrontOpts = running
-      ? { mode: "run", phase, expr: "panic", tilt: 10, blink }
-      : { mode: "stand", expr: "panic", blink };
+      ? { mode: "run", phase, expr: "panic", tilt: 10, blink, look }
+      : { mode: "stand", expr: "panic", blink, look };
     const so: SideOpts = running
       ? { mode: "run", phase, expr: "panic", stomp: 1.4, stride: view.fs }
       : { mode: "stand", expr: "panic", blink };
-    out.places.push(person(cam, who, x, D0, z, running ? view : { side: false, mirror: false }, fo, so, kid ? 0.78 : 1));
-    blob(out, x, D0, z, kid ? 0.78 : 1);
+    // SUNK into the wave: how far behind the front this runner is — 0 while 1.5 m
+    // ahead of it, 1 once 1.5 m behind it. The card drops so the molasses (drawn
+    // on the card, below) covers the legs up to the waist, instead of the runner
+    // standing dry on the cobbles with the wave's hard edge slicing through them.
+    // No contact blob once caught: they are in the flood, not standing on dry
+    // ground (same rule as trapped, shot 6).
+    const caught = clamp01((frontZ - z + 1.5) / 3.0);
+    const waistY = kid ? 740 : 640; // design-y of the waist (hip) for this build
+    const waistH = (975 - waistY) * SU * (kid ? 0.78 : 1); // waist height above the soles, in m
+    const sink = caught * Math.max(0.05, waistH - 0.30); // waist ends ~0.30 m above the street
+    const pl = person(cam, who, x, D0 - sink, z, running ? view : { side: false, mirror: false }, fo, so, kid ? 0.78 : 1);
+    if (caught > 0.02) {
+      pl.key += `|mol${q(sink, 20)}`;
+      const draw0 = pl.draw;
+      pl.draw = (p) => { draw0(p); molassesOver(p, waistY, view.side); };
+    }
+    out.places.push(pl);
+    if (caught <= 0.02) blob(out, x, D0, z, kid ? 0.78 : 1);
   }
 };
 
@@ -405,8 +463,10 @@ const trapped = (cam: CamInfo, t: number, out: Stage) => {
     [-3.5, -6, 0], [-1.2, -2, 1], [1.8, -8, 2], [3.6, -4, 3], [-0.6, -4, 4], [2.6, -10, 5], [-4.4, -10, 0], [0.8, -12, 1],
   ]; // all eight clustered at z -12..-2: the shot-6 camera looks north from the street's south end, and the old southern spots (z +2..+6) sat behind it, out of the 28 deg horizontal frame
   spots.forEach(([x, z, v], i) => {
-    const o = neighbour(v * 2); // cap/jacket outfits only (no dresses in the flood)
-    const who: Who = { i: 500 + i, o, okey: `n${(v * 2) % 6}` };
+    // cap/jacket outfits only (no dresses in the flood), but bold caps so the eight
+    // trapped figures are distinct people, not identical dots
+    const o = { ...neighbour(v * 2), cap: BOLD_CAPS[i % 4] };
+    const who: Who = { i: 500 + i, o, okey: `n${(v * 2) % 6}c${i % 4}` };
     const expr: Expr = (["pained", "worry", "determined", "pained"] as Expr[])[i % 4];
     const bob = 0.02 * Math.sin(t * 1.8 + i * 1.3); // struggling against the set molasses
     // Card base at D0+0.32 (NOT sunk): for "trapped" the torso is drawn to the soles (no legs), so the

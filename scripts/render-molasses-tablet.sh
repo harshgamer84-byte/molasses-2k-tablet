@@ -113,14 +113,14 @@ render_chunk() {
   echo "=== $name DONE $(date -Is) ===" | tee -a out/render/progress.log
 }
 
-render_chunk chunkS1 0-250
-render_chunk chunkS2 251-501
-render_chunk chunkS3 502-752
-render_chunk chunkS4 753-1003
-render_chunk chunkS5 1004-1254
-render_chunk chunkS6 1255-1505
-render_chunk chunkS7 1506-1756
-render_chunk chunkS8 1757-2009
+render_chunk chunkS1 0-325
+render_chunk chunkS2 326-651
+render_chunk chunkS3 652-977
+render_chunk chunkS4 978-1303
+render_chunk chunkS5 1304-1629
+render_chunk chunkS6 1630-1955
+render_chunk chunkS7 1956-2281
+render_chunk chunkS8 2282-2601
 echo "ALL CHUNKS DONE $(date -Is)" | tee -a out/render/progress.log
 
 printf "file '%s'\n" \
@@ -140,4 +140,4 @@ ffmpeg -y -v error -i out/molasses-2k.mp4 -i audio/mix.wav \
   out/molasses-2k-final.mp4
 echo "CONCAT + MUX DONE $(date -Is) — out/molasses-2k-final.mp4" | tee -a out/render/progress.log
 echo "Copy it somewhere safe: cp out/molasses-2k-final.mp4 /sdcard/Download/molasses-short-2k.mp4"
-echo "Tell worker it is done — the VM will run the delivery checks (ffprobe ~67 s / 1440x2560 / 30 fps / h264+AAC, loudness, frame spot-checks across all 9 shots)."
+echo "Tell worker it is done — the VM will run the delivery checks (ffprobe ~87 s / 1440x2560 / 30 fps / h264+AAC, loudness, frame spot-checks across all 9 shots)."

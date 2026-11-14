@@ -98,12 +98,10 @@ const Inner: React.FC<{ id: number; kit: Kit }> = ({ id, kit }) => {
 const dprOverride = () => (getInputProps() as { post?: { dpr?: number } }).post?.dpr;
 const ShotView: React.FC<{ id: number; kit: Kit; alpha: number }> = ({ id, kit, alpha }) => (
   <AbsoluteFill style={{ opacity: alpha }}>
-    <div style={{ width: 540, height: 960, transform: "scale(2)", transformOrigin: "top left" }}>
-      <ThreeCanvas width={540} height={960} {...(dprOverride() ? { dpr: dprOverride() } : {})} shadows gl={{ antialias: false, stencil: false, powerPreference: "high-performance", toneMappingExposure: 1.0 }}
-        camera={{ fov: 40, near: 0.2, far: 1500 }}>
-        <Inner id={id} kit={kit} />
-      </ThreeCanvas>
-    </div>
+    <ThreeCanvas width={1080} height={1920} {...(dprOverride() ? { dpr: dprOverride() } : {})} shadows gl={{ antialias: false, stencil: false, powerPreference: "high-performance", toneMappingExposure: 1.0 }}
+      camera={{ fov: 40, near: 0.2, far: 1500 }}>
+      <Inner id={id} kit={kit} />
+    </ThreeCanvas>
   </AbsoluteFill>
 );
 

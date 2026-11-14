@@ -154,17 +154,21 @@ export class GradeEffect extends Effect {
 // the old dark stills) and washed the new lighting out; these are gentle S-curves at full strength instead.
 //   day: mid knot .60 for median Y' ~.57, darks pressed (.1 -> .085), a hint of violet in shadows.
 //   golden: stronger S (darks .1 -> .09, mids .5 -> .54), blue-violet shadow tint, orange highlight tint, heavier vignette.
+// v2 re-fit (2026-11-13, user: "colours look trash" — the gentle presets read pale/washed next to the reference's
+// deep saturated frames). Day converges back toward the FITTED GRADE_DAY saturation (mids 1.27, highlights 1.46)
+// with a stronger S-curve, a real blue-violet shadow tint and warm highlights; golden is pushed the same way.
+// The round-2 "wash-out" worry is superseded by the user's verdict: pale is the problem now, not bright.
 export const GRADE_DAY2: GradeParams = {
-  ky: [0, 0.1, 0.28, 0.6, 0.835, 0.945, 1],
-  sat: [1.0, 1.05, 1.0],
-  tintS: [0.01, 0.002], tintM: [0, 0], tintH: [0.006, 0],
-  vig: [0.12, 0.45],
+  ky: [0, 0.085, 0.26, 0.58, 0.835, 0.95, 1],
+  sat: [1.0, 1.3, 1.45],
+  tintS: [0.03, 0.0], tintM: [0.008, -0.002], tintH: [-0.01, 0.008],
+  vig: [0.18, 0.42],
 };
 export const GRADE_GOLDEN2: GradeParams = {
-  ky: [0, 0.09, 0.245, 0.54, 0.8, 0.93, 1],
-  sat: [1.0, 1.12, 1.15],
-  tintS: [0.02, 0.002], tintM: [0, 0], tintH: [-0.012, 0.006],
-  vig: [0.2, 0.4],
+  ky: [0, 0.08, 0.23, 0.52, 0.8, 0.93, 1],
+  sat: [1.05, 1.35, 1.6],
+  tintS: [0.04, 0.0], tintM: [0.01, -0.002], tintH: [-0.02, 0.01],
+  vig: [0.26, 0.38],
 };
 export const GRADES: Record<"day" | "golden", GradeParams> = { day: GRADE_DAY2, golden: GRADE_GOLDEN2 };
 /** One strength (0..1, the effect's `amount`) per preset, set against the NEW world (bridge_world, 2026-10-31): full-strength
