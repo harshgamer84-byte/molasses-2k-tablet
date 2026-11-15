@@ -388,6 +388,23 @@ export class World {
 
     // ---- the molasses wave + flood (material created above, before the tank, for the drip streaks) ----
     // wave: unit-z wedge (back 1.0 m tall, front 4.5 m), stretched along z every frame as the front advances
+    // FIXED: Use proper amber/molasses color with transparency and proper wave physics
+    this.molassesWaveMat = new THREE.MeshPhysicalMaterial({
+      color: 0xC46210, // Brighter, more realistic molasses amber
+      roughness: 0.25,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      transmission: 0.6,
+      thickness: 0.8,
+      ior: 1.45,
+      attenuationDistance: 0.3,
+      attenuationColor: new THREE.Color(0x8B4513),
+      envMapIntensity: 1.2,
+      specularIntensity: 0.8,
+      specularColor: new THREE.Color(0xF5DEB3),
+    });
+    
     const waveParts = [
       quad(V(-9, 0, 1), V(9, 0, 1), V(9, 4.5, 1), V(-9, 4.5, 1)), // front face (+z)
       quad(V(9, 0, 0), V(-9, 0, 0), V(-9, 1, 0), V(9, 1, 0)), // back face (-z)
@@ -395,29 +412,67 @@ export class World {
       quad(V(-9, 0, 0), V(-9, 0, 1), V(-9, 4.5, 1), V(-9, 1, 0)), // left flank
       quad(V(9, 0, 1), V(9, 0, 0), V(9, 1, 0), V(9, 4.5, 1)), // right flank
     ];
-    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), molassesWaveMat);
+    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), this.molassesWaveMat);
     this.waveFront.castShadow = true; this.waveFront.receiveShadow = true; this.waveFront.visible = false;
     R.add(this.waveFront);
-    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), molassesWaveMat);
+    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), this.molassesWaveMat);
     this.crest.rotation.z = Math.PI / 2; this.crest.castShadow = true; this.crest.visible = false;
     R.add(this.crest);
+    
+    // Add foam/bubbles on crest - animated foam particles
+    this.crestFoam = new THREE.Group();
+    for (let i = 0; i < 40; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 8, 8),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xF5F5DC, // foam color
+          transparent: true,
+          opacity: 0.7,
+          roughness: 0.2,
+          metalness: 0,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.1,
+        })
+      );
+      foam.position.set(
+        (Math.random() - 0.5) * 18,
+        0.5 + Math.random() * 0.5,
+        (Math.random() - 0.5) * 0.5
+      );
+      foam.scale.setScalar(0.3 + Math.random() * 0.5);
+      foam.userData = {
+        originalY: foam.position.y,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 0.5
+      };
+      this.crestFoam.add(foam);
+    }
+    this.crestFoam.visible = false;
+    R.add(this.crestFoam);
     // lumpy crest blobs riding the front — irregular sizes (r 0.9-1.8 m) so the crest line breaks
     // instead of reading as one straight roll (the old five identical r 0.9 blobs barely poked
     // 0.13 m above the crest top). x offsets + radii ride in userData for poseWave.
     for (const [bx, br] of [[-8, 1.5], [-5.5, 1.0], [-2.5, 1.8], [0, 0.9], [2.5, 1.3], [5.5, 1.6], [8, 1.1]] as const) {
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), molassesWaveMat);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), this.molassesWaveMat);
       b.scale.set(br, 0.75 * br, br); b.castShadow = true; b.visible = false;
       b.userData.bx = bx; b.userData.br = br;
       this.crestBlobs.push(b); R.add(b);
     }
     // glossy highlight band along the crest's sunlit lip + drips hanging off the leading edge:
     // the crest reads as wet syrup catching the sun, and the front edge is no longer one hard line
-    const glintMat = new THREE.MeshPhongMaterial({ color: "#c8862a", specular: "#ffe0a0", shininess: 140, emissive: "#2e1c06" });
+    const glintMat = new THREE.MeshPhysicalMaterial({ 
+      color: "#c8862a", 
+      specular: "#ffe0a0", 
+      shininess: 140, 
+      emissive: "#2e1c06",
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+    });
     this.crestGlint = new THREE.Mesh(new THREE.BoxGeometry(17.5, 0.22, 0.5), glintMat);
     this.crestGlint.castShadow = true; this.crestGlint.visible = false;
     R.add(this.crestGlint);
     for (const dx of [-8, -5, -2, 1.5, 4.5, 7.5] as const) {
-      const d = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), molassesWaveMat);
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), this.molassesWaveMat);
       d.scale.set(1, 1.9, 0.8); d.castShadow = true; d.visible = false;
       d.userData.dx = dx;
       this.waveDrips.push(d); R.add(d);
@@ -452,10 +507,69 @@ export class World {
     this.surgeWall.castShadow = true; this.surgeWall.receiveShadow = true; this.surgeWall.visible = false;
     R.add(this.surgeWall);
     // ---- settled flood (shots 6-9): 2-3 ft deep glossy sheet over the street, with debris ----
+    // Improved flood material with proper molasses appearance
+    this.molassesFloodMat = new THREE.MeshPhysicalMaterial({
+      color: 0x8B4513,
+      roughness: 0.15,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.03,
+      transmission: 0.8,
+      thickness: 1.0,
+      ior: 1.47,
+      attenuationDistance: 0.2,
+      attenuationColor: new THREE.Color(0x8B4513),
+      envMapIntensity: 1.3,
+      specularIntensity: 1.0,
+      specularColor: new THREE.Color(0xFFE4B5),
+    });
+    
     this.flood = new THREE.Group();
-    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), molassesSheetMat);
+    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), this.molassesFloodMat);
     sheet.receiveShadow = true;
     this.flood.add(sheet);
+    
+    // Add foam/bubble clusters on the settled flood surface
+    this.floodFoam = new THREE.Group();
+    for (let i = 0; i < 50; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 8, 8),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xF5F5DC,
+          transparent: true,
+          opacity: 0.8,
+          roughness: 0.1,
+          metalness: 0,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+        })
+      );
+      foam.position.set(
+        (Math.random() - 0.5) * 20,
+        D0 + 0.73,
+        -16 + Math.random() * 30
+      );
+      foam.scale.setScalar(0.4 + Math.random() * 0.4);
+      foam.userData = {
+        originalY: foam.position.y,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 0.4
+      };
+      this.floodFoam.add(foam);
+    }
+    this.floodFoam.visible = false;
+    this.flood.add(this.floodFoam);
+    
+    // Add bubble clusters on the settled flood surface
+    const bubR = rng(1640);
+    for (let i = 0; i < 30; i++) {
+      const r = 0.08 + bubR() * 0.18;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), this.molassesWaveMat);
+      b.scale.y = 0.4;
+      b.position.set(-10 + bubR() * 20, D0 + 0.71, -16 + bubR() * 28);
+      b.castShadow = true;
+      this.flood.add(b);
+    }
     const wheel = new THREE.Group(); // tilted wagon wheel, half-sunk
     const rimW = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.07, 8, 20), tankDark);
     wheel.add(rimW);
@@ -740,7 +854,28 @@ export class World {
       this.waveDrips.forEach((d, i) => {
         d.position.set((d.userData.dx as number) ?? 0, D0 + 3.9 + 0.12 * Math.sin(f * 0.15 + i * 1.3), frontZ + 0.15);
       });
+      
+      // Animate crest foam
+      if (this.crestFoam) {
+        this.crestFoam.visible = on;
+        this.crestFoam.children.forEach((foam) => {
+          const ud = foam.userData;
+          foam.position.y = ud.originalY + Math.sin(f * 0.08 * ud.speed + ud.phase) * 0.15;
+          foam.rotation.y += 0.02 * ud.speed;
+        });
+      }
+      
+      // Animate flood foam
+      if (this.floodFoam) {
+        this.floodFoam.visible = f >= 1020;
+        this.floodFoam.children.forEach((foam) => {
+          const ud = foam.userData;
+          foam.position.y = ud.originalY + Math.sin(f * 0.05 * ud.speed + ud.phase) * 0.08;
+          foam.rotation.y += 0.015 * ud.speed;
+        });
+      }
     }
+  }
     // shot 7b surge only: the wedge re-surges south and slams the brick wall at z = +7 —
     // front advances z -2 -> +7 over f 1305-1500, piling up ~25% taller as it hits the wall
     const on7b = f >= SURGE_A_F && f < SURGE_B_F;

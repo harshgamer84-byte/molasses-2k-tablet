@@ -832,28 +832,85 @@ export const tankSteelHD = () => ctex("tankSteelHD", 2048, 1024, (g, r) => {
  *  The world owner maps this on the wave / flood sheets. */
 export const molassesHD = () => ctex("molassesHD", 1024, 1024, (g, r) => {
   const S = 1024;
-  g.fillStyle = "#33200e"; g.fillRect(0, 0, S, S); // v2: was #2a170c — near-black under the two-tone shade, the swirls never read
-  for (let i = 0; i < 22; i++) { // slow swirls, darker and lighter
-    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 90, 260), light = r() > 0.5;
-    wrap2(S, S, x, y, rad * 1.5, (xx, yy) => blotch(g, xx, yy, rad, 1.5, light ? "96,58,24" : "18,10,4", light ? U(r, 0.3, 0.45) : U(r, 0.3, 0.45)));
+  // Base: rich amber molasses color (not black!)
+  const baseColor = "#8B4513"; // Rich amber/brown
+  g.fillStyle = baseColor; g.fillRect(0, 0, S, S);
+  
+  // Layer 1: Deep base color variations
+  for (let i = 0; i < 30; i++) { // More swirls for richness
+    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 80, 220), light = r() > 0.5;
+    wrap2(S, S, x, y, rad * 1.3, (xx, yy) => blotch(g, xx, yy, rad, 1.3, light ? "139,69,19" : "101,67,33", light ? U(r, 0.3, 0.5) : U(r, 0.2, 0.4)));
   }
-  for (let i = 0; i < 26; i++) { // glossy streaks: soft amber band with a bright centre line
-    const x = U(r, 0, S), y = U(r, 0, S), len = U(r, 200, 700), a = U(r, -0.5, 0.5), w = U(r, 10, 26);
+  
+  // Layer 2: Glossy amber streaks with bright centers (the key "molasses" look)
+  for (let i = 0; i < 40; i++) { // More streaks for richness
+    const x = U(r, 0, S), y = U(r, 0, S), len = U(r, 300, 800), a = U(r, -0.4, 0.4), w = U(r, 12, 32);
     wrap2(S, S, x, y, len, (xx, yy) => {
       g.save(); g.translate(xx, yy); g.rotate(a);
       const gr = g.createLinearGradient(0, -w, 0, w);
-      gr.addColorStop(0, "rgba(140,85,30,0)"); gr.addColorStop(0.5, "rgba(150,95,35,0.38)"); gr.addColorStop(1, "rgba(140,85,30,0)");
+      // Rich amber gradient with bright center
+      gr.addColorStop(0, "rgba(139,69,19,0)");      // Transparent edges
+      gr.addColorStop(0.25, "rgba(180,100,30,0.15)"); // Warm edges
+      gr.addColorStop(0.5, "rgba(210,140,40,0.55)"); // Bright amber center
+      gr.addColorStop(0.75, "rgba(180,100,30,0.15)"); // Warm edges
+      gr.addColorStop(1, "rgba(139,69,19,0)");      // Transparent edges
       g.fillStyle = gr; g.fillRect(-len / 2, -w, len, w * 2);
-      g.fillStyle = "rgba(200,140,60,0.5)"; g.fillRect(-len / 2, -1.5, len, 3);
+      // Bright center highlight line
+      g.fillStyle = "rgba(255,215,100,0.4)"; g.fillRect(-len / 2, -1, len, 2);
       g.restore();
     });
   }
-  for (let i = 0; i < 30; i++) { // bubbles
-    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 3, 9);
-    wrap2(S, S, x, y, 12, (xx, yy) => {
-      g.fillStyle = "rgba(90,55,22,0.7)"; g.beginPath(); g.arc(xx, yy, rad, 0, TAU); g.fill();
-      g.fillStyle = "rgba(220,160,80,0.55)"; g.beginPath(); g.arc(xx - rad * 0.3, yy - rad * 0.3, rad * 0.3, 0, TAU); g.fill();
+  
+  // Layer 3: Subtle variations/mottling
+  for (let i = 0; i < 20; i++) {
+    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 40, 120);
+    wrap2(S, S, x, y, rad * 1.5, (xx, yy) => blotch(g, xx, yy, rad, 1.5, "160,100,40", U(r, 0.15, 0.25)));
+  }
+  
+  // Layer 4: Glossy highlights (the "wet" look)
+  for (let i = 0; i < 35; i++) { // More highlight streaks
+    const x = U(r, 0, S), y = U(r, 0, S), len = U(r, 150, 500), a = U(r, -0.3, 0.3), w = U(r, 6, 18);
+    wrap2(S, S, x, y, len, (xx, yy) => {
+      g.save(); g.translate(xx, yy); g.rotate(a);
+      const gr = g.createLinearGradient(0, -w, 0, w);
+      gr.addColorStop(0, "rgba(205,155,50,0)");
+      gr.addColorStop(0.3, "rgba(255,215,80,0.25)");
+      gr.addColorStop(0.5, "rgba(255,225,120,0.6)"); // Bright center!
+      gr.addColorStop(0.7, "rgba(200,140,40,0.2)");
+      gr.addColorStop(1, "rgba(180,100,30,0)");
+      g.fillStyle = gr; g.fillRect(-len / 2, -w, len, w * 2);
+      // Specular highlight line
+      g.fillStyle = "rgba(255,240,180,0.5)"; g.fillRect(-len / 2, -0.5, len, 1);
+      g.restore();
     });
+  }
+  
+  // Layer 5: Small bubbles with proper highlights
+  for (let i = 0; i < 45; i++) {
+    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 4, 14);
+    wrap2(S, S, x, y, 16, (xx, yy) => {
+      const bubbleR = Math.max(2, rad);
+      // Bubble body
+      const gr = g.createRadialGradient(xx, yy, 0, xx, yy, rad);
+      gr.addColorStop(0, "rgba(220,180,90,0.9)");   // Bright center
+      gr.addColorStop(0.5, "rgba(180,120,40,0.6)"); // Amber middle
+      gr.addColorStop(0.8, "rgba(120,70,20,0.4)");  // Darker edge
+      gr.addColorStop(1, "rgba(80,40,10,0.15)");    // Dark edge
+      g.fillStyle = gr;
+      g.beginPath(); g.arc(xx, yy, rad, 0, TAU); g.fill();
+      // Specular highlight
+      g.fillStyle = "rgba(255,245,200,0.8)";
+      g.beginPath(); g.arc(xx - rad * 0.25, yy - rad * 0.25, rad * 0.25, 0, TAU); g.fill();
+      // Secondary highlight
+      g.fillStyle = "rgba(255,255,200,0.3)";
+      g.beginPath(); g.arc(xx - rad * 0.15, yy - rad * 0.15, rad * 0.1, 0, TAU); g.fill();
+    });
+  }
+  
+  // Layer 6: Subtle color variations / impurities
+  for (let i = 0; i < 15; i++) {
+    const x = U(r, 0, S), y = U(r, 0, S), rad = U(r, 60, 180);
+    wrap2(S, S, x, y, rad, (xx, yy) => blotch(g, xx, yy, rad, 1.2, "180,110,40", U(r, 0.08, 0.15)));
   }
 });
 

@@ -100,6 +100,7 @@ export const bridgeState = (id: number, t: number): BridgeState => {
 // whoosh in the sound mix peaks there), so a glide key starts dur/2 earlier. Holds push in (dolly toward the look
 // point or a fov zoom near walls/towers): 0.15-0.35 %/f, ~0.6 %/f for ~35 f on the punch words. Rolls of 4-8 deg
 // over >= 18 f on emphasis beats, held tilt <= 0.07 rad.
+// IMPORTANT: Camera must not clip through walls - maintain minimum distance from buildings
 export type Cam = { pos: V3; look: V3; fov: number; roll: number };
 type Shot = Partial<Cam> & { pos: V3; look: V3 };
 type Key = { f: number; dur?: number; cut?: boolean; s: (f: number) => Shot };
