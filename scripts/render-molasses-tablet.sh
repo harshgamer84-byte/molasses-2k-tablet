@@ -16,36 +16,39 @@
 #   * The render passes --browser-executable (Termux Chromium) and
 #     --binaries-location=/data/data/com.termux/files/usr/bin (Termux
 #     ffmpeg), exactly like the proven v5 tablet render.
-#   * --gl=swangle (software WebGL via SwiftShader). The initial
-#     --gl=angle failed with "Error creating WebGL context" on ARM
-#     Chromium. swangle/swiftshader is the software fallback that
-#     works reliably on this tablet.
+#   * --gl=angle-egl (ANGLE on EGL). The initial --gl=angle failed
+#     with "Error creating WebGL context" on ARM Chromium; angle-egl
+#     is the backend that initializes cleanly on this tablet.
 #   * The memory gate uses `free` when available (setup installs
 #     procps); if `free` is missing it warns and continues.
 #   * This package INCLUDES audio/mix.wav, so the tablet does the
 #     concat + mux itself and finishes with out/molasses-2k-final.mp4.
 #
-# WHAT IT DOES: renders MolassesShort (2010 frames, 1440x2560,
-# 30 fps, 67 s) in 8 chunks (h264 crf 16, --scale
-# 1.3333333333333333, --gl=swangle --concurrency=1 --timeout=600000
-# --muted), then concats the chunks with the ffmpeg concat demuxer
-# (-c copy) to out/molasses-2k.mp4 (picture only) and muxes
-# audio/mix.wav to out/molasses-2k-final.mp4.
+# WHAT IT DOES: renders MolassesShort (2602 frames, 1440x2560,
+# 30 fps, ~87 s) in 8 chunks (h264 crf 16, --scale
+# 1.3333333333333333, --gl=angle-egl --concurrency=$CONC
+# --timeout=600000 --muted), then concats the chunks with the ffmpeg
+# concat demuxer (-c copy) to out/molasses-2k.mp4 (picture only) and
+# muxes audio/mix.wav to out/molasses-2k-final.mp4.
 #
-# DO NOT CHANGE: --concurrency MUST stay 1 — concurrency 2 corrupts
-# every frame on this pipeline (tiled blue-blob pattern, proven in
-# out/speedtest2k/ on the VM). --scale MUST stay exactly
-# 1.3333333333333333 — 1.3333 gives a non-integer height (2559.936)
-# and the stitcher rejects it. --timeout 600000: the first frame
-# needs ~2 minutes to load + compile shaders.
+# CONCURRENCY: default 1. Concurrency 2 corrupted frames on the OLD
+# swangle pipeline (tiled blue-blob pattern, proven on the VM) and is
+# UNTESTED with angle-egl on this tablet — only try CONC=2 on a single
+# chunk and eyeball the output first. The GPU is shared, so 2 tabs
+# rarely doubles speed; it mostly doubles RAM use, and Android's low
+# memory killer then drops frames mid-chunk.
+# DO NOT CHANGE: --scale MUST stay exactly 1.3333333333333333 — 1.3333
+# gives a non-integer height (2559.936) and the stitcher rejects it.
+# --timeout 600000: the first frame needs ~2 minutes to load + compile
+# shaders.
 #
 # RESUMABLE: a chunk whose mp4 already exists is skipped, so a
 # relaunch after a stall, a throttle, a phantom-process kill or a
 # closed terminal only re-renders the unfinished chunk. set -e stops
 # on a failed chunk instead of blindly continuing. Ranges are
 # inclusive and contiguous:
-# 0-250, 251-501, 502-752, 753-1003, 1004-1254, 1255-1505,
-# 1506-1756, 1757-2009 = 2010 frames.
+# 0-325, 326-651, 652-977, 978-1303, 1304-1629, 1630-1955,
+# 1956-2281, 2282-2601 = 2602 frames.
 #
 # RUN IT: plug the tablet in, run `termux-wake-lock` first so Android
 # does not kill Termux with the screen off, close everything else,
@@ -62,6 +65,15 @@ export REMOTION_TMP="$PWD/remotion-tmp"
 export TEMP="$PWD/remotion-tmp"
 export TMP="$PWD/remotion-tmp"
 mkdir -p "$TMPDIR" out/render
+
+# Concurrency: 1 is the only proven-safe value on this tablet.
+# Set CONC=2 to EXPERIMENT on a single chunk after eyeballing output.
+CONC="${CONC:-1}"
+case "$CONC" in
+  1) ;;
+  2) echo "WARNING: CONC=2 is untested with --gl=angle-egl here. Watch for artifacts / OOM kills." ;;
+  *) echo "ABORT: CONC must be 1 or 2 (got '$CONC')." >&2; exit 1 ;;
+esac
 
 CHROME="$(command -v chromium-browser || command -v chromium || true)"
 if [ -z "$CHROME" ]; then
@@ -88,8 +100,10 @@ need_mem() {
   local avail
   avail=$(free -m | awk '/^Mem:/ {print $7}')
   echo "available=${avail} MB at $(date -u '+%F %T UTC')"
-  if [ "$avail" -lt 2000 ]; then
-    echo "ABORT: need >= 2000 MB available to start a chunk (have ${avail} MB). Finished chunks are kept; close apps and re-run this script." >&2
+  local need=2000
+  [ "$CONC" = "2" ] && need=3500
+  if [ "$avail" -lt "$need" ]; then
+    echo "ABORT: need >= ${need} MB available for CONC=${CONC} (have ${avail} MB). Finished chunks are kept; close apps and re-run this script." >&2
     exit 1
   fi
 }
@@ -97,9 +111,17 @@ need_mem() {
 render_chunk() {
   local name=$1 range=$2
   local out="out/render/$name.mp4"
-  if [ -s "$out" ]; then
-    echo "=== $name $range SKIPPED (already rendered: $out) ===" | tee -a out/render/progress.log
+  local want got
+  want=$(( ${range##*-} - ${range%%-*} + 1 ))
+  got=$(ffprobe -v error -select_streams v:0 -count_packets \
+    -show_entries stream=nb_read_packets -of csv=p=0 "$out" 2>/dev/null || true)
+  if [ -s "$out" ] && [ "$got" = "$want" ]; then
+    echo "=== $name $range SKIPPED (already rendered: $out, $got frames) ===" | tee -a out/render/progress.log
     return 0
+  fi
+  if [ -s "$out" ]; then
+    echo "=== $name exists but has ${got:-0}/$want frames — deleting and re-rendering ===" | tee -a out/render/progress.log
+    rm -f "$out"
   fi
   need_mem
   echo "=== $name $range started $(date -Is) ===" | tee -a out/render/progress.log
@@ -108,7 +130,7 @@ render_chunk() {
     --frames="$range" \
     --browser-executable="$CHROME" \
     --binaries-location="$BINARIES" \
-    --gl=angle-egl --concurrency=1 --timeout=600000 --muted --overwrite \
+    --gl=angle-egl --concurrency="$CONC" --timeout=600000 --muted --overwrite \
     > "out/render/$name.log" 2>&1
   echo "=== $name DONE $(date -Is) ===" | tee -a out/render/progress.log
 }

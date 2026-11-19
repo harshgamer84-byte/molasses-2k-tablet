@@ -462,8 +462,8 @@ export class World {
     // the crest reads as wet syrup catching the sun, and the front edge is no longer one hard line
     const glintMat = new THREE.MeshPhysicalMaterial({ 
       color: "#c8862a", 
-      specular: "#ffe0a0", 
-      shininess: 140, 
+      metalness: 0.1,
+      roughness: 0.15,
       emissive: "#2e1c06",
       clearcoat: 1.0,
       clearcoatRoughness: 0.05,
@@ -606,12 +606,12 @@ export class World {
     }
     // bubble clusters on the settled flood: small glossy domes half-sunk in the sheet top, so the
     // flood surface catches the light instead of reading as one flat brown plane
-    const bubR = rng(1640);
+    const bubR2 = rng(1640);
     for (let i = 0; i < 10; i++) {
-      const r = 0.12 + bubR() * 0.22;
+      const r = 0.12 + bubR2() * 0.22;
       const b = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), molassesWaveMat);
       b.scale.y = 0.55;
-      b.position.set(-10 + bubR() * 20, D0 + 0.72, -16 + bubR() * 28);
+      b.position.set(-10 + bubR2() * 20, D0 + 0.72, -16 + bubR2() * 28);
       b.castShadow = true;
       this.flood.add(b);
     }
@@ -875,7 +875,7 @@ export class World {
         });
       }
     }
-  }
+
     // shot 7b surge only: the wedge re-surges south and slams the brick wall at z = +7 —
     // front advances z -2 -> +7 over f 1305-1500, piling up ~25% taller as it hits the wall
     const on7b = f >= SURGE_A_F && f < SURGE_B_F;
