@@ -114,7 +114,7 @@ render_chunk() {
   local want got
   want=$(( ${range##*-} - ${range%%-*} + 1 ))
   got=$(ffprobe -v error -select_streams v:0 -count_packets \
-    -show_entries stream=nb_read_packets -of csv=p=0 "$out" 2>/dev/null || true)
+    -show_entries stream=nb_read_packets -of csv=p=0 "$out" 2>/dev/null | tr -d '[:space:]' || true)
   if [ -s "$out" ] && [ "$got" = "$want" ]; then
     echo "=== $name $range SKIPPED (already rendered: $out, $got frames) ===" | tee -a out/render/progress.log
     return 0
