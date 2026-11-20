@@ -30,13 +30,13 @@ export const loadKit = (): Promise<Kit> => Promise.resolve({});
 // Street centreline x = 0, z -55..+15; cobbles x -7..7, sidewalks to x +-10.
 // Ballpark: centre PARK = [70, D0, -75].
 const TANK = { x: 0, z: -30, r: 13.7, h: 15.2 };
-const BURST_F = 810; // shot 5: the tank rips open (t = 27.0 s)
-const WAVE_END_F = 1020; // the wave's leading edge reaches z = +15 at the end of shot 5
-const FLOOD_F = 1020; // settled flood from shot 6 on
-/** flood ends at f 1640: shot 8b (f 1640-1785) is the rebuilt street and must not be flooded */
-const FLOOD_END_F = 1640;
-/** shot 7b surge window (f 1305-1500): warm pour + wave slamming the south brick wall */
-const SURGE_A_F = 1326, SURGE_B_F = 1500; // shot-7 beat cut moved 1305 -> 1326 by CAM (lands 3 f before "warm")
+const BURST_F = 1067; // shot 5: the tank rips open (t = 35.574 s, matching SNAP in story.ts)
+const WAVE_END_F = 1357; // the wave reaches z = +15 at the end of shot 5
+const FLOOD_F = 1357; // settled flood from shot 6 on
+/** flood ends at f 2151: shot 8b (f 2151-2372) is the rebuilt street and must not be flooded */
+const FLOOD_END_F = 2151;
+/** shot 7b surge window (f 1740-1939): warm pour + wave slamming the south brick wall */
+const SURGE_A_F = 1740, SURGE_B_F = 1939; // shot-7 beat cut: warm pour + wave slams the wall
 /** cast.ts stage() still takes the bridge set's BridgeState; molasses crowds never use it — pass a zero one. */
 const ZERO_B: BridgeState = { bounce: 0, drop: 0, snap: 0, collapsed: false };
 
@@ -143,6 +143,7 @@ export class World {
   private panelBAxis = new THREE.Vector3(); private panelCAxis = new THREE.Vector3();
   private spray: { m: THREE.Mesh; v: THREE.Vector3; s: number }[] = [];
   private sprayMat: THREE.MeshPhongMaterial;
+  private popRivets: { mesh: THREE.Mesh; jet: THREE.Mesh; startF: number; origin: THREE.Vector3; vel: THREE.Vector3 }[] = [];
   // ---- wave + flood ----
   private molassesMat: THREE.Material;
   private waveFront: THREE.Mesh; private crest: THREE.Mesh; private crestBlobs: THREE.Mesh[] = [];
@@ -284,7 +285,7 @@ export class World {
     tankTex.wrapS = tankTex.wrapT = THREE.RepeatWrapping;
     const tankMat = twoTone(new THREE.MeshLambertMaterial({ map: tankTex }), 0.3);
     const tankDS = twoTone(new THREE.MeshLambertMaterial({ color: "#6a4526", side: THREE.DoubleSide }), 0.3);
-    const tankDark = twoTone(new THREE.MeshLambertMaterial({ color: "#5a3a20" }), 0.3);
+    const tankDark = twoTone(new THREE.MeshLambertMaterial({ color: "#22150e" }), 0.3);
     const tankGroup = new THREE.Group();
     tankGroup.position.set(TANK.x, D0, TANK.z);
     R.add(tankGroup);
@@ -292,17 +293,17 @@ export class World {
     this.tankFull.position.y = TANK.h / 2;
     this.tankFull.castShadow = true; this.tankFull.receiveShadow = true;
     tankGroup.add(this.tankFull);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(TANK.r, 0.18, 8, 48), tankDark);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(TANK.r, 0.22, 8, 48), tankDark);
     rim.rotation.x = Math.PI / 2; rim.position.y = TANK.h; rim.castShadow = true;
     tankGroup.add(rim);
-    for (const y of [5, 10]) { // steel banding round the shell
-      const band = new THREE.Mesh(new THREE.TorusGeometry(TANK.r + 0.02, 0.12, 8, 48), tankDark);
+    for (const y of [5, 10]) { // steel banding round the shell: darker, high relief
+      const band = new THREE.Mesh(new THREE.TorusGeometry(TANK.r + 0.03, 0.16, 8, 48), tankDark);
       band.rotation.x = Math.PI / 2; band.position.y = y;
       tankGroup.add(band);
     }
-    // rivet bands: instanced studs in horizontal rows round the shell
+    // rivet bands: instanced studs in horizontal rows round the shell (larger r 0.12 so relief is crisp)
     const rows = [1.2, 3.9, 6.6, 9.3, 12.0, 14.7], per = 56;
-    this.rivets = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 6, 5), tankDark, rows.length * per);
+    this.rivets = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), tankDark, rows.length * per);
     this.rivets.frustumCulled = false;
     rows.forEach((y, ri) => {
       for (let k = 0; k < per; k++) {
@@ -337,6 +338,20 @@ export class World {
       this.streaks.add(d);
     }
     tankGroup.add(this.streaks);
+    // popping rivets (frames 983, 1012, 1041 in Shot 4, leading up to the burst at 1067)
+    const jetMat = new THREE.MeshPhongMaterial({ color: "#2e1c0c", specular: "#9a7a4a", shininess: 90, transparent: true, opacity: 0.88 });
+    this.popRivets = [
+      { startF: 983, origin: new THREE.Vector3(-1.8, D0 + 6.6, -16.3 + 0.1), vel: new THREE.Vector3(-2.2, 5.5, 12.0) },
+      { startF: 1012, origin: new THREE.Vector3(2.4, D0 + 3.9, -16.3 + 0.1), vel: new THREE.Vector3(3.0, 6.2, 14.0) },
+      { startF: 1041, origin: new THREE.Vector3(0.2, D0 + 9.3, -16.3 + 0.1), vel: new THREE.Vector3(0.8, 7.0, 16.0) },
+    ].map((cfg) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), tankDark);
+      mesh.castShadow = true; mesh.visible = false; R.add(mesh);
+      const jet = new THREE.Mesh(new THREE.ConeGeometry(0.24, 2.4, 8), jetMat);
+      jet.geometry.rotateX(Math.PI / 2); // point forward (+z towards street)
+      jet.castShadow = true; jet.visible = false; R.add(jet);
+      return { ...cfg, mesh, jet };
+    });
     // burst panels: after f 810 the closed cylinder is hidden and the shell is the torn back
     // (theta 2.4..5.43) plus three curved panels that hinge outward and fall. The front panel is
     // NARROW (theta -0.4..0.4, 11 m arc, ~1.1 m crown when flat) so that, once down, it lies low in
@@ -388,6 +403,23 @@ export class World {
 
     // ---- the molasses wave + flood (material created above, before the tank, for the drip streaks) ----
     // wave: unit-z wedge (back 1.0 m tall, front 4.5 m), stretched along z every frame as the front advances
+    // FIXED: Use proper amber/molasses color with transparency and proper wave physics
+    this.molassesWaveMat = new THREE.MeshPhysicalMaterial({
+      color: 0xC46210, // Brighter, more realistic molasses amber
+      roughness: 0.25,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      transmission: 0.6,
+      thickness: 0.8,
+      ior: 1.45,
+      attenuationDistance: 0.3,
+      attenuationColor: new THREE.Color(0x8B4513),
+      envMapIntensity: 1.2,
+      specularIntensity: 0.8,
+      specularColor: new THREE.Color(0xF5DEB3),
+    });
+    
     const waveParts = [
       quad(V(-9, 0, 1), V(9, 0, 1), V(9, 4.5, 1), V(-9, 4.5, 1)), // front face (+z)
       quad(V(9, 0, 0), V(-9, 0, 0), V(-9, 1, 0), V(9, 1, 0)), // back face (-z)
@@ -395,29 +427,67 @@ export class World {
       quad(V(-9, 0, 0), V(-9, 0, 1), V(-9, 4.5, 1), V(-9, 1, 0)), // left flank
       quad(V(9, 0, 1), V(9, 0, 0), V(9, 1, 0), V(9, 4.5, 1)), // right flank
     ];
-    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), molassesWaveMat);
+    this.waveFront = new THREE.Mesh(mergeGeometries(waveParts, false), this.molassesWaveMat);
     this.waveFront.castShadow = true; this.waveFront.receiveShadow = true; this.waveFront.visible = false;
     R.add(this.waveFront);
-    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), molassesWaveMat);
+    this.crest = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18.5, 12), this.molassesWaveMat);
     this.crest.rotation.z = Math.PI / 2; this.crest.castShadow = true; this.crest.visible = false;
     R.add(this.crest);
+    
+    // Add foam/bubbles on crest - animated foam particles
+    this.crestFoam = new THREE.Group();
+    for (let i = 0; i < 40; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 8, 8),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xF5F5DC, // foam color
+          transparent: true,
+          opacity: 0.7,
+          roughness: 0.2,
+          metalness: 0,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.1,
+        })
+      );
+      foam.position.set(
+        (Math.random() - 0.5) * 18,
+        0.5 + Math.random() * 0.5,
+        (Math.random() - 0.5) * 0.5
+      );
+      foam.scale.setScalar(0.3 + Math.random() * 0.5);
+      foam.userData = {
+        originalY: foam.position.y,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 0.5
+      };
+      this.crestFoam.add(foam);
+    }
+    this.crestFoam.visible = false;
+    R.add(this.crestFoam);
     // lumpy crest blobs riding the front — irregular sizes (r 0.9-1.8 m) so the crest line breaks
     // instead of reading as one straight roll (the old five identical r 0.9 blobs barely poked
     // 0.13 m above the crest top). x offsets + radii ride in userData for poseWave.
     for (const [bx, br] of [[-8, 1.5], [-5.5, 1.0], [-2.5, 1.8], [0, 0.9], [2.5, 1.3], [5.5, 1.6], [8, 1.1]] as const) {
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), molassesWaveMat);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), this.molassesWaveMat);
       b.scale.set(br, 0.75 * br, br); b.castShadow = true; b.visible = false;
       b.userData.bx = bx; b.userData.br = br;
       this.crestBlobs.push(b); R.add(b);
     }
     // glossy highlight band along the crest's sunlit lip + drips hanging off the leading edge:
     // the crest reads as wet syrup catching the sun, and the front edge is no longer one hard line
-    const glintMat = new THREE.MeshPhongMaterial({ color: "#c8862a", specular: "#ffe0a0", shininess: 140, emissive: "#2e1c06" });
+    const glintMat = new THREE.MeshPhysicalMaterial({ 
+      color: "#c8862a", 
+      metalness: 0.1,
+      roughness: 0.15,
+      emissive: "#2e1c06",
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+    });
     this.crestGlint = new THREE.Mesh(new THREE.BoxGeometry(17.5, 0.22, 0.5), glintMat);
     this.crestGlint.castShadow = true; this.crestGlint.visible = false;
     R.add(this.crestGlint);
     for (const dx of [-8, -5, -2, 1.5, 4.5, 7.5] as const) {
-      const d = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), molassesWaveMat);
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), this.molassesWaveMat);
       d.scale.set(1, 1.9, 0.8); d.castShadow = true; d.visible = false;
       d.userData.dx = dx;
       this.waveDrips.push(d); R.add(d);
@@ -452,10 +522,69 @@ export class World {
     this.surgeWall.castShadow = true; this.surgeWall.receiveShadow = true; this.surgeWall.visible = false;
     R.add(this.surgeWall);
     // ---- settled flood (shots 6-9): 2-3 ft deep glossy sheet over the street, with debris ----
+    // Improved flood material with proper molasses appearance
+    this.molassesFloodMat = new THREE.MeshPhysicalMaterial({
+      color: 0x8B4513,
+      roughness: 0.15,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.03,
+      transmission: 0.8,
+      thickness: 1.0,
+      ior: 1.47,
+      attenuationDistance: 0.2,
+      attenuationColor: new THREE.Color(0x8B4513),
+      envMapIntensity: 1.3,
+      specularIntensity: 1.0,
+      specularColor: new THREE.Color(0xFFE4B5),
+    });
+    
     this.flood = new THREE.Group();
-    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), molassesSheetMat);
+    const sheet = new THREE.Mesh(boxGeo(V(-12, D0 - 0.1, -18), V(12, D0 + 0.75, 15)), this.molassesFloodMat);
     sheet.receiveShadow = true;
     this.flood.add(sheet);
+    
+    // Add foam/bubble clusters on the settled flood surface
+    this.floodFoam = new THREE.Group();
+    for (let i = 0; i < 50; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 8, 8),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xF5F5DC,
+          transparent: true,
+          opacity: 0.8,
+          roughness: 0.1,
+          metalness: 0,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+        })
+      );
+      foam.position.set(
+        (Math.random() - 0.5) * 20,
+        D0 + 0.73,
+        -16 + Math.random() * 30
+      );
+      foam.scale.setScalar(0.4 + Math.random() * 0.4);
+      foam.userData = {
+        originalY: foam.position.y,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 0.4
+      };
+      this.floodFoam.add(foam);
+    }
+    this.floodFoam.visible = false;
+    this.flood.add(this.floodFoam);
+    
+    // Add bubble clusters on the settled flood surface
+    const bubR = rng(1640);
+    for (let i = 0; i < 30; i++) {
+      const r = 0.08 + bubR() * 0.18;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), this.molassesWaveMat);
+      b.scale.y = 0.4;
+      b.position.set(-10 + bubR() * 20, D0 + 0.71, -16 + bubR() * 28);
+      b.castShadow = true;
+      this.flood.add(b);
+    }
     const wheel = new THREE.Group(); // tilted wagon wheel, half-sunk
     const rimW = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.07, 8, 20), tankDark);
     wheel.add(rimW);
@@ -492,12 +621,12 @@ export class World {
     }
     // bubble clusters on the settled flood: small glossy domes half-sunk in the sheet top, so the
     // flood surface catches the light instead of reading as one flat brown plane
-    const bubR = rng(1640);
+    const bubR2 = rng(1640);
     for (let i = 0; i < 10; i++) {
-      const r = 0.12 + bubR() * 0.22;
+      const r = 0.12 + bubR2() * 0.22;
       const b = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), molassesWaveMat);
       b.scale.y = 0.55;
-      b.position.set(-10 + bubR() * 20, D0 + 0.72, -16 + bubR() * 28);
+      b.position.set(-10 + bubR2() * 20, D0 + 0.72, -16 + bubR2() * 28);
       b.castShadow = true;
       this.flood.add(b);
     }
@@ -698,22 +827,45 @@ export class World {
     this.panelA.visible = burst;
     this.panelB.visible = burst;
     this.panelC.visible = burst;
+
+    // animate popping rivets during Shot 4 (leading up to burst at BURST_F)
+    for (const pop of this.popRivets) {
+      if (f >= pop.startF && f < BURST_F + 30) {
+        pop.mesh.visible = true;
+        const dt = (f - pop.startF) / FPS;
+        pop.mesh.position.set(
+          pop.origin.x + pop.vel.x * dt,
+          Math.max(D0 + 0.1, pop.origin.y + pop.vel.y * dt - 4.9 * dt * dt),
+          pop.origin.z + pop.vel.z * dt
+        );
+        pop.mesh.rotation.x = f * 0.4; pop.mesh.rotation.y = f * 0.3;
+        // molasses pressure jet shooting from hole
+        pop.jet.visible = f < BURST_F;
+        if (pop.jet.visible) {
+          const jetLen = Math.min(2.5, 0.4 + dt * 5.0);
+          pop.jet.position.set(pop.origin.x, pop.origin.y, pop.origin.z + jetLen * 0.4);
+          pop.jet.scale.set(1 + Math.sin(f * 0.5) * 0.25, 1 + Math.sin(f * 0.5) * 0.25, jetLen / 2.4);
+        }
+      } else {
+        pop.mesh.visible = false;
+        pop.jet.visible = false;
+      }
+    }
+
     if (!burst) {
       for (const s of this.spray) s.m.visible = false;
       return;
     }
-    const u = smooth((f - BURST_F) / 30); // panels hinge out and fall over 1 s, then lie still (was /75: at f 850 the front panel still filled the frame mid-fall)
+    const u = smooth((f - BURST_F) / 30); // panels hinge out and fall over 1 s, then lie still
     this.panelA.rotation.x = u * 1.5; // front panel falls forward onto the street (top lands near z = -1)
-    // The fallen front panel sinks under the flood as the molasses settles (f 900-1020): its 1.1 m
-    // crown would otherwise hide the trapped figures behind it in shot 6 (round 4). Sunk 0.6 m, the
-    // crown sits at D0+0.55, under the flood top (D0+0.75), so the figures read again.
-    this.panelA.position.y = -0.6 * smooth((f - 900) / 120);
+    // The fallen front panel sinks under the flood as the molasses settles (after burst):
+    this.panelA.position.y = -0.6 * smooth((f - (BURST_F + 90)) / 120);
     this.panelB.quaternion.setFromAxisAngle(this.panelBAxis, u * 1.35); // east panel tips outward to the side
     this.panelC.quaternion.setFromAxisAngle(this.panelCAxis, u * 1.35); // west panel tips outward to the side
     const dt = (f - BURST_F) / FPS;
-    this.sprayMat.opacity = f < 840 ? 1 : 1 - smooth((f - 840) / 60);
+    this.sprayMat.opacity = f < BURST_F + 30 ? 1 : 1 - smooth((f - (BURST_F + 30)) / 60);
     for (const s of this.spray) {
-      s.m.visible = f < 900;
+      s.m.visible = f < BURST_F + 90;
       if (!s.m.visible) continue;
       s.m.position.set(s.v.x * dt, D0 + Math.max(0.4, 5 + s.v.y * dt - 4.9 * dt * dt), -18 + s.v.z * dt);
       s.m.scale.setScalar(s.s * (1 + Math.min(1, dt * 2)));
@@ -740,7 +892,28 @@ export class World {
       this.waveDrips.forEach((d, i) => {
         d.position.set((d.userData.dx as number) ?? 0, D0 + 3.9 + 0.12 * Math.sin(f * 0.15 + i * 1.3), frontZ + 0.15);
       });
+      
+      // Animate crest foam
+      if (this.crestFoam) {
+        this.crestFoam.visible = on;
+        this.crestFoam.children.forEach((foam) => {
+          const ud = foam.userData;
+          foam.position.y = ud.originalY + Math.sin(f * 0.08 * ud.speed + ud.phase) * 0.15;
+          foam.rotation.y += 0.02 * ud.speed;
+        });
+      }
+      
+      // Animate flood foam
+      if (this.floodFoam) {
+        this.floodFoam.visible = f >= 1020;
+        this.floodFoam.children.forEach((foam) => {
+          const ud = foam.userData;
+          foam.position.y = ud.originalY + Math.sin(f * 0.05 * ud.speed + ud.phase) * 0.08;
+          foam.rotation.y += 0.015 * ud.speed;
+        });
+      }
     }
+
     // shot 7b surge only: the wedge re-surges south and slams the brick wall at z = +7 —
     // front advances z -2 -> +7 over f 1305-1500, piling up ~25% taller as it hits the wall
     const on7b = f >= SURGE_A_F && f < SURGE_B_F;
@@ -758,14 +931,14 @@ export class World {
   /** inserts: honey jar only in shot 7a, blueprint only in shot 8a; the drip/pool ooze slowly during 7a */
   private poseProps(f: number) {
     this.flood.visible = f >= FLOOD_F && f < FLOOD_END_F; // shots 6, 7, 8a only — hidden for 8b/9
-    this.honeyTable.visible = f >= 1110 && f < 1305;
+    this.honeyTable.visible = f >= 1488 && f < 1740;
     if (this.honeyTable.visible) {
-      const u = smooth((f - 1110) / 195);
+      const u = smooth((f - 1488) / 252);
       this.honeyDrip.scale.set(1, 1 + 1.4 * u, 1);
       this.honeyDrip.position.y = 1.24 - 0.07 * u;
       this.honeyPool.scale.set(0.6 + 0.7 * u, 0.25, 0.6 + 0.7 * u);
     }
-    this.blueTable.visible = f >= 1500 && f < 1640;
+    this.blueTable.visible = f >= 1939 && f < 2151;
   }
 
   update(id: number, f: number, cam: THREE.PerspectiveCamera, scene: THREE.Scene) {

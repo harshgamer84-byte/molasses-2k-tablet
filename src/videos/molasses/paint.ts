@@ -780,28 +780,30 @@ return t; };
  *  Seams are dark tints, never ink lines. The world owner maps this on the tank cylinder. */
 export const tankSteelHD = () => ctex("tankSteelHD", 2048, 1024, (g, r) => {
   const W = 2048, H = 1024, PW = W / 3, PH = H / 2; // 2 m x 1.5 m plates
-  g.fillStyle = "#6f4a30"; g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 26; i++) { // paint variation: worn lighter patches, darker damp ones
+  g.fillStyle = "#825332"; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 26; i++) { // paint variation: warm steel patches
     const x = U(r, 0, W), y = U(r, 0, H), rad = U(r, 90, 260), light = r() > 0.5;
-    wrap2(W, H, x, y, rad * 1.5, (xx, yy) => blotch(g, xx, yy, rad, 1.5, light ? "150,110,70" : "70,42,22", light ? U(r, 0.08, 0.14) : U(r, 0.07, 0.13)));
+    wrap2(W, H, x, y, rad * 1.5, (xx, yy) => blotch(g, xx, yy, rad, 1.5, light ? "165,115,75" : "80,45,22", light ? U(r, 0.12, 0.22) : U(r, 0.1, 0.18)));
   }
-  for (let i = 0; i < 40; i++) { // long soft grain in the paint
-    grain(g, r, W, U(r, 0, W), U(r, 0, H), U(r, 400, 1400), U(r, 1, 4), U(r, 1.5, 3), r() < 0.5 ? "rgba(140,100,60,0.14)" : "rgba(60,35,18,0.14)");
+  for (let i = 0; i < 40; i++) { // long soft grain in the steel paint
+    grain(g, r, W, U(r, 0, W), U(r, 0, H), U(r, 400, 1400), U(r, 1, 4), U(r, 1.5, 3), r() < 0.5 ? "rgba(160,110,65,0.18)" : "rgba(50,28,14,0.18)");
   }
-  for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) { // plate seams: dark tint + soft shadow
+  for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) { // plate seams: dark tint + crisp light lip
     const x = col * PW, y = row * PH;
-    g.fillStyle = "rgba(40,22,10,0.55)"; g.fillRect(x, y + PH - 3, PW, 5);
-    g.fillStyle = "rgba(255,220,180,0.14)"; g.fillRect(x, y + PH + 2, PW, 2);
-    g.fillStyle = "rgba(40,22,10,0.45)";
+    g.fillStyle = "rgba(28,14,6,0.75)"; g.fillRect(x, y + PH - 3, PW, 6);
+    g.fillStyle = "rgba(255,225,180,0.35)"; g.fillRect(x, y + PH + 3, PW, 2);
+    g.fillStyle = "rgba(28,14,6,0.65)";
     const vx = x + (row % 2 ? PW / 2 : 0);
-    wrapX(W, vx, 4, (xx) => g.fillRect(xx, y, 4, PH));
+    wrapX(W, vx, 5, (xx) => g.fillRect(xx, y, 5, PH));
+    g.fillStyle = "rgba(255,225,180,0.25)";
+    wrapX(W, vx + 5, 2, (xx) => g.fillRect(xx, y, 2, PH));
   }
-  // rivet rows along every horizontal seam (both edges of each plate) and the vertical seams
-  const rivetRow = (y: number, x0: number, x1: number) => { for (let x = x0 + 14; x < x1 - 8; x += 26) nail(g, x, y, 6, "#2e1c10"); };
+  // rivet rows along every horizontal seam (both edges of each plate) and the vertical seams: high contrast
+  const rivetRow = (y: number, x0: number, x1: number) => { for (let x = x0 + 14; x < x1 - 8; x += 26) nail(g, x, y, 7, "#1a0f08"); };
   for (let row = 0; row <= 2; row++) rivetRow(row * PH + 10, 0, W);
   for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
     const vx = col * PW + (row % 2 ? PW / 2 : 0) + 10;
-    for (let y = row * PH + 16; y < (row + 1) * PH - 8; y += 26) wrapX(W, vx, 12, (xx) => nail(g, xx, y, 6, "#2e1c10"));
+    for (let y = row * PH + 16; y < (row + 1) * PH - 8; y += 26) wrapX(W, vx, 14, (xx) => nail(g, xx, y, 7, "#1a0f08"));
   }
   for (let i = 0; i < 34; i++) { // molasses drip streaks running down from rivet rows
     const x = U(r, 0, W), y0 = (Math.floor(r() * 2) * PH) + 12 + U(r, 0, 8), len = U(r, 60, 420), w = U(r, 7, 18);

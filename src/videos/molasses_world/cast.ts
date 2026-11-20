@@ -406,9 +406,9 @@ const street = (id: number, t: number, cam: CamInfo, out: Stage) => {
  *  Staggered starts (0-2.2 s after the burst), 2.8-4.0 m/s, panic faces, run cycle (bigger lean, faster
  *  bob). They hold at the far edge (z = 11) still running rather than popping back to the tank. */
 const flee = (cam: CamInfo, t: number, out: Stage) => {
-  // the wave front, same formula as world.ts waveFront: the molasses reaches z = +15 at f 1020
+  // the wave front, same formula as world.ts waveFront: the molasses reaches z = +15 at f 1357
   const f = Math.round(t * FPS);
-  const frontZ = -16 + 31 * smooth((f - 810) / 210);
+  const frontZ = -16 + 31 * smooth((f - 1067) / 290);
   for (let i = 0; i < 20; i++) {
     const delay = hh(i, 31) * 2.2, z0 = -15 + hh(i, 32) * 8, sp = 2.8 + hh(i, 33) * 1.2;
     const run = Math.max(0, t - SNAP - delay);

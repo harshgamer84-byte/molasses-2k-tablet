@@ -479,8 +479,8 @@ export const bodyFront = (p: Pen, o: Outfit, opts: FrontOpts) => {
   const H = headBlob(seed, Bd.a, facing), W = 2 * H.a, HH = 2 * H.b, u = W / 100;
   const tall = (1 + Bd.torso + Bd.legs) * HH, sole = 975;
   // body bob 5 % (march) / 3 % (stroll) / 8 % (run) of the height, lowest at contact (phase 0 and 0.5)
-  const bob = mode === "march" ? 0.025 * tall * Math.cos(2 * two * phase) : mode === "stroll" ? 0.015 * tall * Math.cos(2 * two * phase)
-    : mode === "run" ? 0.04 * tall * Math.cos(2 * two * phase) : 0;
+  const bob = mode === "march" ? 0.05 * tall * Math.cos(2 * two * phase) : mode === "stroll" ? 0.03 * tall * Math.cos(2 * two * phase)
+    : mode === "run" ? 0.08 * tall * Math.cos(2 * two * phase) : 0;
   // "trapped": waist-deep in the flood, so the torso blob runs all the way to the soles (no legs drawn);
   // the world flood plane cuts the card at waist height from the street cameras
   const torsoBot = mode === "sit" ? sole - 0.2 * HH : mode === "trapped" ? sole : sole - Bd.legs * HH + bob;
@@ -514,13 +514,13 @@ export const bodyFront = (p: Pen, o: Outfit, opts: FrontOpts) => {
       footStroke(p, [fx - side * 3 * u, fy], [fx + side * 12 * u, fy + u], footW, footCol);
     }
   } else {
-    const L = mode === "march" ? lift * 1.25 : mode === "stroll" ? lift * 0.55 : mode === "run" ? lift * 1.9 : 0;
+    const L = mode === "march" ? lift * 1.25 : mode === "stroll" ? lift * 0.55 : mode === "run" ? lift * 2.5 : 0;
     for (const [side, ph] of [[-1, 0], [1, 0.5]] as const) {
       const up = Math.max(0, Math.sin(two * (phase + ph))) * L;
-      const hx = 300 + side * 15 * u, fx = 300 + side * 22 * u, fy = sole - 4 * u - up;
+      const hx = 300 + side * 15 * u, fx = 300 + side * 28 * u, fy = sole - 4 * u - up;
       const k: P2 = [(hx + fx) / 2 + side * (1.5 * u + up * 0.16), (hipY + fy) / 2 - up * 0.08];
       p.stroke(curve([hx, hipY], k, [fx, fy]), legW, legCol);
-      footStroke(p, [fx - side * 3 * u, fy], [fx + side * 13 * u, fy + 0.5 * u], footW, footCol);
+      footStroke(p, [fx - side * 3 * u, fy], [fx + side * 18 * u, fy + 0.5 * u], footW, footCol);
     }
   }
   // ---- upper body: rotates about the hips (tilt + a small weight-shift sway on every step) ----
@@ -538,7 +538,7 @@ export const bodyFront = (p: Pen, o: Outfit, opts: FrontOpts) => {
     const hx = ex + side * 3 * u - side * 6 * u * Math.max(0, fwd) + side * 4 * u * Math.max(0, -fwd);
     return [S, [ex, S[1] + 0.48 * HH], [hx, chin + 1.04 * HH - Math.abs(fwd) * 9 * u]];
   };
-  const sw = mode === "march" || mode === "stroll" ? Math.sin(two * phase) : mode === "run" ? 1.6 * Math.sin(two * phase) : 0;
+  const sw = mode === "march" || mode === "stroll" ? Math.sin(two * phase) : mode === "run" ? 1.8 * Math.sin(two * phase) : 0;
   // rifle at the order: butt by the right hip, held by the hanging right hand, muzzle past the crown
   const R0: P2 = [300 + 47 * u, torsoBot + 0.12 * HH], R1: P2 = [300 + 64 * u, crown - 0.32 * HH];
   const rifle = !!o.rifle && (mode === "march" || mode === "stand" || mode === "stroll");

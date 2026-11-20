@@ -699,7 +699,7 @@ const TEN_STYLES: Style[] = [
 /** flat-roofed tenement: front facade (local +z) at width w, depth d, wall height h (left out if it blocks a shot) */
 export const tenement = (b: Batch, x: number, z: number, yaw: number, w: number, d: number, h: number, si: number, y = D0) => {
   const across = Math.abs(Math.sin(yaw)) > 0.5, hx = (across ? d : w) / 2 + 0.6, hz = (across ? w : d) / 2 + 0.6;
-  if (inTheWay(x - hx, x + hx, y, y + h + 2.4, z - hz, z + hz, false, 4)) return; // cull only if right at a lens
+  if (inTheWay(x - hx, x + hx, y, y + h + 2.4, z - hz, z + hz, true, 1.8)) return; // cull only if camera directly clips inside
   const st = TEN_STYLES[si % TEN_STYLES.length];
   const m = new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z);
   const front = lam(`tenF${si}_${w}_${h}`, () => ({ map: facadeHD(`tenF${si}_${w}_${h}`, w, h, { ...st, door: true }) }));
